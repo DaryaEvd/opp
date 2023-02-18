@@ -40,8 +40,9 @@ unsigned long long countScalarMult(unsigned long long *vector1,
 }
 
 int main(int argc, char *argv[]) {
-  // size_t sizeVect = 32 * 32; //for checking the correct
-  // computations
+  // size for checking the correct computations
+  // size_t sizeVect = 32 * 32;
+
   size_t sizeVect = 512 * 24 * 10;
   printf("Size of vector is: %ld\n", sizeVect);
 
@@ -117,8 +118,6 @@ int main(int argc, char *argv[]) {
         sizeVect, sizeof(unsigned long long));
     unsigned long long *vector2 = (unsigned long long *)calloc(
         sizeVect, sizeof(unsigned long long));
-
-    fillVector(vector1, vector2, sizeVect);
 
     // recieveBuff, countOfRecvBuffer, datatype, sourceNumofSender,
     // tagMsg, comm, status

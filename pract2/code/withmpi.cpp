@@ -142,7 +142,7 @@ void copyVectors(const double *src, double *dst, const size_t size) {
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  int sizeInput = 500;
+  int sizeInput = 100;
   // atoi(argv[1]);
 
   /*    constants declararion   */
@@ -224,10 +224,15 @@ int main(int argc, char *argv[]) {
     zerofyDoubleVectors(xCurr, sizeInput);
   }
 
-  double *b = nullptr;
+  double *b = new double[sizeInput];
   if (rankOfCurrentProc == 0) {
-    b = fillConstantVector(sizeInput);
+    // b = fillConstantVector(sizeInput);
+    for (size_t i = 0; i < sizeInput; ++i) {
+      b[i] = sizeInput + 1.0;
+    }
   }
+
+  // double *b = fillConstantVector(sizeInput);
 
   // посылает сообщения всем процессам группы, включая себя
   MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -279,8 +284,10 @@ int main(int argc, char *argv[]) {
     iterationCounts++;
 
     if (iterationCounts > maxIterationCounts) {
-      std::cout << "Too many iterations. Change init values"
-                << std::endl;
+      if (rankOfCurrentProc == 0) {
+        std::cout << "Too many iterations. Change init values"
+                  << std::endl;
+      }
       delete[] xCurr;
       delete[] xNext;
       delete[] Atmp;
@@ -291,7 +298,7 @@ int main(int argc, char *argv[]) {
       delete[] b;
       delete[] displs;
       delete[] rowsNum;
-      delete sendCounts;
+      delete[] sendCounts;
       MPI_Finalize();
 
       return 0;
@@ -339,7 +346,7 @@ int main(int argc, char *argv[]) {
   delete[] b;
   delete[] displs;
   delete[] rowsNum;
-  delete sendCounts;
+  delete[] sendCounts;
 
   // MPI_Barrier(MPI_COMM_WORLD);
 

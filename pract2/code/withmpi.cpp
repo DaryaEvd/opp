@@ -30,6 +30,7 @@ void zerofyDoubleVectors(double *vector, const size_t sizeInput) {
     vector[i] = 0;
   }
 }
+
 void zerofyIntVectors(int *vector, const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; i++) {
     vector[i] = 0;
@@ -76,26 +77,28 @@ void parallelMultMatrixOnVector(const double *matrixA_part,
                                 int rankOfCurrentProc) {
   // matrixA_part = width * rowsNum[rankOfCurrentProc];
   // res - vector which size dimension is heightPartMatrA
+
   double *tmpRes = new double[heightPartMatrA];
-  zerofyDoubleVectors(tmpRes, heightPartMatrA);
-  multimplyMatrixOnVector(matrixA_part, vector, tmpRes, heightPartMatrA,
-                          widthPartMatrA);
+  // zerofyDoubleVectors(tmpRes, heightPartMatrA);
+  multimplyMatrixOnVector(matrixA_part, vector, tmpRes,
+                          heightPartMatrA, widthPartMatrA);
 
   int *recvCounts = new int[amountOfAvailableProc];
-  zerofyIntVectors(recvCounts, widthPartMatrA);
+  zerofyIntVectors(recvCounts, amountOfAvailableProc);
   for (size_t i = 0; i < amountOfAvailableProc; i++) {
     recvCounts[i] = widthPartMatrA / amountOfAvailableProc;
     recvCounts[i] += (i < widthPartMatrA % amountOfAvailableProc);
   }
 
   int *displs = new int[amountOfAvailableProc];
-  zerofyIntVectors(displs, widthPartMatrA);
+  // zerofyIntVectors(displs, amountOfAvailableProc);
   displs[0] = 0;
   for (size_t i = 1; i < amountOfAvailableProc; i++) {
     displs[i] = displs[i - 1] + recvCounts[i - 1];
   }
 
-  /*** MPI_Allgatherv - собирает блоки с разным числом элементов от каждого процесса 
+  /*** MPI_Allgatherv - собирает блоки с разным числом элементов от
+   каждого процесса
    * @param sendbuf [in] - starting address of send buffer
    * @param sendcounts [in] - amount of elems in send buffer
    * @param sendtype - data type of send buffer elements
@@ -108,8 +111,8 @@ void parallelMultMatrixOnVector(const double *matrixA_part,
    * @param recvtype - data type of recieve buffer elements
    * @param Comm - communicator
    */
-  MPI_Allgatherv(tmpRes, heightPartMatrA, MPI_DOUBLE, res,
-                 recvCounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+  MPI_Allgatherv(tmpRes, heightPartMatrA, MPI_DOUBLE, res, recvCounts,
+                 displs, MPI_DOUBLE, MPI_COMM_WORLD);
 
   delete[] tmpRes;
   delete[] recvCounts;
@@ -137,7 +140,10 @@ void copyVectors(const double *src, double *dst, const size_t size) {
 }
 
 int main(int argc, char *argv[]) {
-  const size_t sizeInput = atoi(argv[1]);
+  MPI_Init(&argc, &argv);
+
+  int sizeInput = 500;
+  // atoi(argv[1]);
 
   /*    constants declararion   */
   const double accuracy = 1e-10;
@@ -149,7 +155,7 @@ int main(int argc, char *argv[]) {
   int convergenceCount = 0;
 
   /* turn on mpi.h*/
-  MPI_Init(&argc, &argv);
+  // MPI_Init(&argc, &argv);
   double startTime = MPI_Wtime();
 
   /* count amount of proccesses and ranks in proc*/
@@ -183,7 +189,7 @@ int main(int argc, char *argv[]) {
 
   int *displs = new int[amountOfAvailableProc];
   displs[0] = 0;
-  for (int i = 1; i < sizeInput; i++) {
+  for (int i = 1; i < amountOfAvailableProc; i++) {
     displs[i] = displs[i - 1] + sendCounts[i - 1];
   }
   double *matrixA_part = new double[sendCounts[rankOfCurrentProc]];
@@ -212,7 +218,7 @@ int main(int argc, char *argv[]) {
   size_t heightPartA =
       rowsNum[rankOfCurrentProc]; // количество строк
                                   // в данном процессе
-  
+
   double *xCurr = new double[sizeInput];
   if (rankOfCurrentProc == 0) {
     zerofyDoubleVectors(xCurr, sizeInput);
@@ -223,7 +229,7 @@ int main(int argc, char *argv[]) {
     b = fillConstantVector(sizeInput);
   }
 
-  //посылает сообщения всем процессам группы, включая себя
+  // посылает сообщения всем процессам группы, включая себя
   MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   // size_t b_width = 1;
   size_t b_height = sizeInput;
@@ -241,7 +247,7 @@ int main(int argc, char *argv[]) {
   double prevEndCrit = 0, endCrit = 0;
 
   while (1) {
-    MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // we need to count A * x_n (= Atmp)
     // it's 'fat operation', so need to parallel it :)
@@ -261,7 +267,7 @@ int main(int argc, char *argv[]) {
         countScalarMult(y, Atmp, sizeInput); // (y_n, A * y_n)
     double denumerator =
         countScalarMult(Atmp, Atmp, sizeInput); // (A * y_n, A * y_n)
-    
+
     double tau = numerator / denumerator;
 
     countVectorMultNumber(y, tau, tauY, sizeInput); // tau * y
@@ -283,6 +289,10 @@ int main(int argc, char *argv[]) {
       delete[] matrixA_part;
       delete[] matrixA_full;
       delete[] b;
+      delete[] displs;
+      delete[] rowsNum;
+      delete sendCounts;
+      MPI_Finalize();
 
       return 0;
     }
@@ -304,10 +314,11 @@ int main(int argc, char *argv[]) {
 
     std::cout << "iteration " << iterationCounts
               << " ended ===" << std::endl;
-  }  
+  }
+  double endTime = MPI_Wtime();
 
   if (rankOfCurrentProc == 0) {
-    double endTime = MPI_Wtime();
+    // double endTime = MPI_Wtime();
     if (convergenceCount <= maxConvergenceCount) {
       std::cout << "Iteration amount in total: " << iterationCounts
                 << "\n";
@@ -326,6 +337,9 @@ int main(int argc, char *argv[]) {
   delete[] matrixA_part;
   delete[] matrixA_full;
   delete[] b;
+  delete[] displs;
+  delete[] rowsNum;
+  delete sendCounts;
 
   // MPI_Barrier(MPI_COMM_WORLD);
 
@@ -333,4 +347,3 @@ int main(int argc, char *argv[]) {
   MPI_Finalize();
   return 0;
 }
-

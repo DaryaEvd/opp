@@ -208,12 +208,15 @@ int main(int argc, char *argv[]) {
   }
 
   double *partMatrA = new double[sendCounts[rankOfCurrProc]];
-  // MPI_Scatterv(fullMatrA, sendCounts, displs, MPI_DOUBLE, partMatrA,
-  //              sendCounts[rankOfCurrProc], MPI_DOUBLE, 0,
-  //              MPI_COMM_WORLD);
-  // // ура, разослали каждому процессу элементы (их разное количество в
-  // // процессах)
+  MPI_Scatterv(fullMatrA, sendCounts, displs, MPI_DOUBLE, partMatrA,
+               sendCounts[rankOfCurrProc], MPI_DOUBLE, 0,
+               MPI_COMM_WORLD);
+  // ура, разослали каждому процессу элементы (их разное количество в
+  // процессах)
 
+  MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  
   // int widthPartA = sizeInput;
   // int heightPartA = rowsNum[rankOfCurrProc];
 

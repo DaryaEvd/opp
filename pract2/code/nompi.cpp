@@ -5,12 +5,13 @@
 double *fillRandomMatrix(const size_t size) {
   double *matrixA = new double[size * size];
   for (size_t i = 0; i < size; ++i) {
-    srand(i);
+    // srand(i);
     for (size_t j = 0; j < size; ++j) {
       if (i == j) {
         matrixA[i * size + j] = 9999;
       } else {
         matrixA[i * size + j] = rand() % 500 + 150.15;
+        // matrixA[i * size + j] = 100;
       }
     }
   }
@@ -34,8 +35,9 @@ double *fillConstantMatrix(const size_t size) {
 double *fillRandomVector(const size_t size) {
   double *vector = new double[size];
   for (size_t i = 0; i < size; ++i) {
-    srand(i);
-    vector[i] = rand() % 500;
+    // srand(i);
+    // vector[i] = rand() % 500;
+    vector[i] = 300;
   }
   return vector;
 }
@@ -68,7 +70,7 @@ void printMatrix(double *matrix, const size_t size) {
 
 void printVector(const double *vector, const size_t size) {
   for (size_t i = 0; i < size; ++i) {
-    std::cout << vector[i] << " ";
+    std::cout << std::fixed << vector[i] << " ";
   }
   std::cout << std::endl;
 }
@@ -93,7 +95,7 @@ double countScalarMult(const double *vector1, const double *vector2,
   return res;
 }
 
-double vectorLength(const size_t size, const double *vector) {
+double countVectorLength(const size_t size, const double *vector) {
   return sqrt(countScalarMult(vector, vector, size));
 }
 
@@ -133,61 +135,72 @@ int main(int argc, char *argv[]) {
   size_t iterationCounts = 0;
   int convergenceCount = 0;
 
-  double *xCurr = new double[size];
-  double *xNext = new double[size];
-  zerofyVectors(xCurr, size);
-  zerofyVectors(xNext, size);
-
   double *Atmp = new double[size];
   double *y = new double[size];
   double *tauY = new double[size];
 
-  double prevEndCrit = 0, endCrit = 0;
+  double *xCurr = new double[size];
+  double *xNext = new double[size];
+  zerofyVectors(xNext, size);
 
+  double prevEndCrit = 0, endCrit = 0;
   struct timespec endt, startt;
-  
 
   double *matrixA = fillRandomMatrix(size);
+  // double *matrixA = fillConstantMatrix(size);
+  // printMatrix(matrixA, size);
+
+  // double *b = fillConstantVector(size);
   double *b = fillRandomVector(size);
+  // std::cout << "vector b is: " << std::endl;
+  // printVector(b, size);
+
+  zerofyVectors(xCurr, size);
+  // std::cout << "vector X is: " << std::endl;
+  // printVector(xCurr, size);
+
   // std::cout << "matrix A is" << std::endl;
   // printMatrix(matrixA, size);
   // std::cout << "vector b is" << std::endl;
   // printVector(b, size);
 
 
+
+
   // double *matrixA = fillConstantMatrix(size);
   // printMatrix(matrixA, size);
   // double *u = fillVectorU(size);
   // std::cout << "vector u is" << std::endl;
-  // printVector(u, size);  
+  // printVector(u, size);
   // double *b = new double[size];
   // multimplyMatrixOnVector(matrixA, u, b, size);
   // std::cout << "vector b is" << std::endl;
   // printVector(b, size);
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &startt);
-  double bNorm = vectorLength(size, b);
+  double bNorm = countVectorLength(size, b);
+  // std::cout << "b norm is: " << bNorm << ",  ";
 
   while (1) {
     multimplyMatrixOnVector(matrixA, xCurr, Atmp, size); // A * x_n
-    substructVectors(Atmp, b, y, size);   // y_n = A * x_n - b
-    double yNorm = vectorLength(size, y); // || A * x_n - b ||
-
+    substructVectors(Atmp, b, y, size);        // y_n = A * x_n - b
+    double yNorm = countVectorLength(size, y); // || A * x_n - b ||
+    std::cout << "Y norm is: " << yNorm << ",  ";
     zerofyVectors(Atmp, size);
     multimplyMatrixOnVector(matrixA, y, Atmp, size); // A * y_n
     double numerator =
         countScalarMult(y, Atmp, size); // (y_n, A * y_n)
-    double denumerator = countScalarMult(Atmp, Atmp, size); // (A * y_n, A * y_n)
+    double denumerator =
+        countScalarMult(Atmp, Atmp, size); // (A * y_n, A * y_n)
 
     double tau = numerator / denumerator;
 
     countVectorMultNumber(y, tau, tauY, size); // tau * y
-    substructVectors(xCurr, tauY, xNext, size); // x_n+1 = x_n - tau * y
+    substructVectors(xCurr, tauY, xNext,
+                     size); // x_n+1 = x_n - tau * y
 
     double endCriteria = yNorm / bNorm;
-
-    iterationCounts++;
-
+    std::cout << "endcrit is: " << std::fixed << endCriteria << " ";
     if (iterationCounts > maxIterationCounts) {
       std::cout << "Too many iterations. Change init values"
                 << std::endl;
@@ -202,26 +215,37 @@ int main(int argc, char *argv[]) {
       return 0;
     }
     if (endCriteria < epsilon) {
+      std::cout << "endCriteria < epsilon !!!!!!!!!!!!!!!!!!!!"
+                << std::endl;
       break;
     }
 
-    if (convergenceCount > maxConvergenceCount) {
-      break;
-    } else if (endCrit < prevEndCrit) {
-      convergenceCount++;
-    } else if (endCrit > prevEndCrit) {
-      convergenceCount = 0;
-    }
+    // if (convergenceCount > maxConvergenceCount) {
+    //   std::cout << "convergenceCount > maxConvergenceCount "
+    //                "!!!!!!!!!!!!!!!!!!!!"
+    //             << std::endl;
+    //   break;
+    // } else if (endCrit < prevEndCrit) {
+    //   std::cout << "I'm in endCrit < prevEndCrit" << std::endl;
+    //   convergenceCount++;
+    // } else if (endCrit > prevEndCrit) {
+    //   std::cout << "I'm in endCrit > prevEndCrit" << std::endl;
+    //   convergenceCount = 0;
+    // }
 
     copyVectors(xNext, xCurr, size);
     prevEndCrit = endCrit;
+    iterationCounts++;
 
     std::cout << "iteration " << iterationCounts
               << " ended ===" << std::endl;
   }
 
+  clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
+
   if (convergenceCount <= maxConvergenceCount) {
-    std::cout << "Iteration amount in total: " << iterationCounts << "\n";
+    std::cout << "Iteration amount in total: " << iterationCounts
+              << "\n";
 
   } else {
     std::cout << "There are no solutions!\n";
@@ -231,7 +255,8 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Time taken: "
             << endt.tv_sec - startt.tv_sec +
-                   accuracy * (endt.tv_nsec - startt.tv_nsec) << " sec";
+                   accuracy * (endt.tv_nsec - startt.tv_nsec)
+            << " sec";
   std::cout << std::endl;
 
   // std::cout << "Solution (vector x is): " << std::endl;

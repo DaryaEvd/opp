@@ -88,6 +88,19 @@ void multimplyMatrixOnVector(const double *matrix,
   }
 }
 
+void parallelMultMatrixOnVector(const double *matrix,
+                                const double *vector, double *res,
+                                size_t matrixRowsNumber,
+                                size_t matrixColumnsNumber) {
+  for (size_t i = 0; i < matrixRowsNumber; i++) {
+    res[i] = 0;
+    for (size_t j = 0; j < matrixColumnsNumber; j++) {
+      auto sum_part = matrix[i * matrixColumnsNumber + j] * vector[j];
+      res[i] += sum_part;
+    }
+  }
+}
+
 double countScalarMult(const double *vector1, const double *vector2,
                        const size_t sizeInput) {
   double res = 0;
@@ -116,6 +129,16 @@ void substructVectors(const double *vector1, const double *vector2,
   }
 }
 
+void parallelSubstrucVectors(const double *vector1,
+                             const double *vector2, double *res,
+                             const size_t sizeInput,
+                             const int offsetVector1,
+                             const int offsetVector2) {
+  for (size_t i = 0; i < sizeInput; i++) {
+    res[i] = vector1[offsetVector1 + i] - vector2[offsetVector2 + i];
+  }
+}
+
 void zerofyVectors(double *vector, const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; i++) {
     vector[i] = 0;
@@ -135,13 +158,6 @@ int main(int argc, char *argv[]) {
 
   const size_t maxIterationCounts = 50000;
   size_t iterationCounts = 0;
-
-  double *Atmp = new double[sizeInput];
-  double *y = new double[sizeInput];
-  double *tauY = new double[sizeInput];
-  double *xCurr = new double[sizeInput];
-  double *xNext = new double[sizeInput];
-  zerofyVectors(xNext, sizeInput);
 
   // double *fullMatrA = fillRandomMatrix(sizeInput);
   // double *fullMatrA = fillConstantMatrix(sizeInput);
@@ -163,17 +179,21 @@ int main(int argc, char *argv[]) {
 
   int amountOfProcs, rankOfCurrProc;
   MPI_Comm_size(MPI_COMM_WORLD, &amountOfProcs);
-  std::cout << "amountOfProcs: " << amountOfProcs << std::endl;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &rankOfCurrProc);
-  std::cout << "rankOfCurrProc: " << rankOfCurrProc << std::endl;
-
-  double *fullMatrA =  new double[sizeInput * sizeInput];
-  double *u = new double[sizeInput];
-  double *b = new double[sizeInput];
 
   if (rankOfCurrProc == 0) {
-    
+    std::cout << "amountOfProcs: " << amountOfProcs << std::endl;
+    std::cout << "rankOfCurrProc: " << rankOfCurrProc << std::endl;
+  }
+  double *fullMatrA = new double[sizeInput * sizeInput];
+  double *u = new double[sizeInput];
+  double *b = new double[sizeInput];
+  double *xCurr = new double[sizeInput];
+  zerofyVectors(xCurr, sizeInput);
+
+  if (rankOfCurrProc == 0) {
+
     fillConstantMatrix(fullMatrA, sizeInput);
     printMatrix(fullMatrA, sizeInput);
 
@@ -214,90 +234,122 @@ int main(int argc, char *argv[]) {
   // ура, разослали каждому процессу элементы (их разное количество в
   // процессах)
 
+  size_t widthPartMatrA = sizeInput;
+  size_t heightPartMatrixA = rowsNum[rankOfCurrProc];
+
   MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  
+  // MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
   // int widthPartA = sizeInput;
   // int heightPartA = rowsNum[rankOfCurrProc];
 
-  // while (1) {
-  //   multimplyMatrixOnVector(fullMatrA, xCurr, Atmp,
-  //                           sizeInput);      // A * x_n
-  //   substructVectors(Atmp, b, y, sizeInput); // y_n = A * x_n - b
-  //   double yNorm =
-  //       countVectorLength(sizeInput, y); // || A * x_n - b ||
-  //   std::cout << "Y norm is: " << yNorm << ",  ";
-  //   zerofyVectors(Atmp, sizeInput);
-  //   multimplyMatrixOnVector(fullMatrA, y, Atmp, sizeInput); // A * y_n
-  //   double numerator =
-  //       countScalarMult(y, Atmp, sizeInput); // (y_n, A * y_n)
-  //   double denumerator =
-  //       countScalarMult(Atmp, Atmp, sizeInput); // (A * y_n, A * y_n)
+  double *Atmp = new double[rowsNum[rankOfCurrProc]];
+  double *yPart = new double[rowsNum[rankOfCurrProc]];
+  double *yFull = new double[sizeInput];
+  // double *tauY = new double[sizeInput];
+  // double *xNext = new double[sizeInput];
+  // zerofyVectors(xNext, sizeInput);
 
-  //   double tau = numerator / denumerator;
+  int count = 0;
+  while (count < 3) {
+    count++;
+    MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-  //   countVectorMultNumber(y, tau, tauY, sizeInput); // tau * y
-  //   substructVectors(xCurr, tauY, xNext,
-  //                    sizeInput); // x_n+1 = x_n - tau * y
+    parallelMultMatrixOnVector(partMatrA, xCurr, Atmp,
+                               heightPartMatrixA, widthPartMatrA);
 
-  //   double endCriteria = yNorm / bNorm;
-  //   std::cout << "endcrit is: " << std::fixed << endCriteria << " ";
-  //   if (iterationCounts > maxIterationCounts) {
-  //     std::cout << "Too many iterations. Change init values"
-  //               << std::endl;
+    parallelSubstrucVectors(Atmp, b, yPart, heightPartMatrixA, 0,
+                            displs[rankOfCurrProc]);
 
-  //     delete[] partMatrA;
-  //     delete[] displs;
-  //     delete[] rowsNum;
-  //     delete[] sendCounts;
-  //     delete[] xCurr;
-  //     delete[] xNext;
-  //     delete[] Atmp;
-  //     delete[] y;
-  //     delete[] tauY;
-  //     delete[] fullMatrA;
-  //     delete[] b;
-  //     MPI_Finalize();
-  //     return 0;
-  //   }
-  //   if (endCriteria < epsilon) {
-  //     std::cout << "endCriteria < epsilon !!!!!!!!!!!!!!!!!!!!"
-  //               << std::endl;
-  //     break;
-  //   }
+    MPI_Allgatherv(yPart, rowsNum[rankOfCurrProc], MPI_DOUBLE, yFull,
+                   rowsNum, displs, MPI_DOUBLE, MPI_COMM_WORLD);
 
-  //   copyVectors(xNext, xCurr, sizeInput);
-  //   iterationCounts++;
+    //   multimplyMatrixOnVector(fullMatrA, xCurr, Atmp,
+    //                           sizeInput);      // A * x_n
+    //   substructVectors(Atmp, b, yPart, sizeInput); // y_n = A * x_n
+    //   - b double yNorm =
+    //       countVectorLength(sizeInput, yPart); // || A * x_n - b ||
+    //   std::cout << "Y norm is: " << yNorm << ",  ";
+    //   zerofyVectors(Atmp, sizeInput);
+    //   multimplyMatrixOnVector(fullMatrA, yPart, Atmp, sizeInput);
+    //   // A
+    //   * y_n double numerator =
+    //       countScalarMult(yPart, Atmp, sizeInput); // (y_n, A *
+    //       y_n)
+    //   double denumerator =
+    //       countScalarMult(Atmp, Atmp, sizeInput); // (A * y_n, A *
+    //       y_n)
 
-  //   std::cout << "iteration " << iterationCounts
-  //             << " ended ===" << std::endl;
-  // }
+    //   double tau = numerator / denumerator;
 
-  // double endTime = MPI_Wtime();
+    //   countVectorMultNumber(yPart, tau, tauY, sizeInput); // tau *
+    //   yPart substructVectors(xCurr, tauY, xNext,
+    //                    sizeInput); // x_n+1 = x_n - tau * yPart
 
-  // if (rankOfCurrProc == 0) {
-  //   std::cout << "Iteration amount in total: " << iterationCounts
-  //             << "\n";
+    //   double endCriteria = yNorm / bNorm;
+    //   std::cout << "endcrit is: " << std::fixed << endCriteria << "
+    //   "; if (iterationCounts > maxIterationCounts) {
+    //     std::cout << "Too many iterations. Change init values"
+    //               << std::endl;
 
-  //   // else {     std::cout << "There are no solutions!\n";  }
+    //     delete[] partMatrA;
+    //     delete[] displs;
+    //     delete[] rowsNum;
+    //     delete[] sendCounts;
+    //     delete[] xCurr;
+    //     delete[] xNext;
+    //     delete[] Atmp;
+    //     delete[] yPart;
+    //     delete[] tauY;
+    //     delete[] fullMatrA;
+    //     delete[] b;
+    //     MPI_Finalize();
+    //     return 0;
+    //   }
+    //   if (endCriteria < epsilon) {
+    //     std::cout << "endCriteria < epsilon !!!!!!!!!!!!!!!!!!!!"
+    //               << std::endl;
+    //     break;
+    //   }
 
-  //   std::cout << "Time taken: " << endTime - startTime << " sec";
-  //   std::cout << std::endl;
+    //   copyVectors(xNext, xCurr, sizeInput);
+    //   iterationCounts++;
 
-  //   std::cout << "Solution (vector x is): " << std::endl;
-  //   printVector(xNext, sizeInput);
-  // }
+    //   std::cout << "iteration " << iterationCounts
+    //             << " ended ===" << std::endl;
+    // }
 
+    // double endTime = MPI_Wtime();
+
+    // if (rankOfCurrProc == 0) {
+    //   std::cout << "Iteration amount in total: " << iterationCounts
+    //             << "\n";
+
+    //   // else {     std::cout << "There are no solutions!\n";  }
+
+    //   std::cout << "Time taken: " << endTime - startTime << " sec";
+    //   std::cout << std::endl;
+
+    //   std::cout << "Solution (vector x is): " << std::endl;
+    //   printVector(xNext, sizeInput);
+  }
+
+  if (rankOfCurrProc == 0) {
+    std::cout << "yFull is: ";
+    printVector(yFull, sizeInput);
+  }
+
+  delete[] yFull;
   delete[] partMatrA;
   delete[] displs;
   delete[] rowsNum;
   delete[] sendCounts;
 
   delete[] xCurr;
-  delete[] xNext;
+  // delete[] xNext;
   delete[] Atmp;
-  delete[] y;
-  delete[] tauY;
+  // delete[] yPart;
+  // delete[] tauY;
   delete[] fullMatrA;
   delete[] b;
 

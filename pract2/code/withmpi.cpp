@@ -193,15 +193,15 @@ int main(int argc, char **argv) {
   if (rankOfCurrProc == 0) {
 
     fillConstantMatrix(fullMatrA, sizeInput);
-    // printMatrix(fullMatrA, sizeInput);
+    printMatrix(fullMatrA, sizeInput);
 
     fillVectorU(u, sizeInput);
     std::cout << "vector u is" << std::endl;
-    // printVector(u, sizeInput);
+    printVector(u, sizeInput);
 
     multimplyMatrixOnVector(fullMatrA, u, b, sizeInput);
     std::cout << "vector b is" << std::endl;
-    // printVector(b, sizeInput);
+    printVector(b, sizeInput);
   }
 
   double bNorm = countVectorLength(sizeInput, b);
@@ -221,8 +221,7 @@ int main(int argc, char **argv) {
     sendCounts[i] =
         rowsNum[i] * sizeInput; // how many elems in each proc
 
-    recvCounts[i] = basicRowsCount +
-                 (i < restRowsCount);
+    recvCounts[i] = basicRowsCount + (i < restRowsCount);
   }
 
   int *displs = new int[amountOfProcs];
@@ -233,11 +232,10 @@ int main(int argc, char **argv) {
 
   int *offset = new int[amountOfProcs];
   offset[0] = 0;
-  for(int i = 1; i < amountOfProcs; i++) {
+  for (int i = 1; i < amountOfProcs; i++) {
     recvCounts[i] = basicRowsCount + (i < restRowsCount);
     offset[i] = offset[i - 1] + recvCounts[i - 1];
   }
-
 
   double *partMatrA = new double[sendCounts[rankOfCurrProc]];
   MPI_Scatterv(fullMatrA, sendCounts, displs, MPI_DOUBLE, partMatrA,
@@ -276,23 +274,28 @@ int main(int argc, char **argv) {
                                rowsNum[rankOfCurrProc], sizeInput);
     std::cout << "After mult matrix on vector" << std::endl;
 
-    parallelSubstrucVectors(partMatrA_X, b, yPart, rowsNum[rankOfCurrProc]);
-     std::cout << "After substru matrix on vector" << std::endl;
-    
+    parallelSubstrucVectors(partMatrA_X, b, yPart,
+                            rowsNum[rankOfCurrProc]);
+    std::cout << "After substru matrix on vector" << std::endl;
+
     MPI_Allgatherv(yPart, rowsNum[rankOfCurrProc], MPI_DOUBLE, yFull,
                    recvCounts, offset, MPI_DOUBLE, MPI_COMM_WORLD);
 
-    // double yNorm = countVectorLength(sizeInput, yFull);
-    // if(rankOfCurrProc == 0) {
-    //    std::cout << "Y norm is: " << yNorm << ",  ";
-    // }
+    double yNorm = countVectorLength(sizeInput, yFull);
+    if (rankOfCurrProc == 0) {
+      std::cout << "Y norm is: " << yNorm << ",  ";
+    }
+
+    parallelMultMatrixOnVector(partMatrA, yFull, partAY,
+                               rowsNum[rankOfCurrProc], sizeInput);
     
-    // parallelMultMatrixOnVector()
+
+
 
     //   multimplyMatrixOnVector(fullMatrA, xCurr, partMatrA_X,
     //                           sizeInput);      // A * x_n
-    //   substructVectors(partMatrA_X, b, yPart, sizeInput); // y_n = A *
-    //   x_n
+    //   substructVectors(partMatrA_X, b, yPart, sizeInput); // y_n =
+    //   A * x_n
     //   - b
     //  double yNorm =
     //       countVectorLength(sizeInput, yPart); // || A * x_n - b ||
@@ -301,11 +304,11 @@ int main(int argc, char **argv) {
     //   multimplyMatrixOnVector(fullMatrA, yPart, partMatrA_X,
     //   sizeInput);
     //   // A    //   * y_n double numerator =
-    //       countScalarMult(yPart, partMatrA_X, sizeInput); // (y_n, A *
-    //       y_n)
+    //       countScalarMult(yPart, partMatrA_X, sizeInput); // (y_n,
+    //       A * y_n)
     //   double denumerator =
-    //       countScalarMult(partMatrA_X, partMatrA_X, sizeInput); // (A *
-    //       y_n, A * y_n)
+    //       countScalarMult(partMatrA_X, partMatrA_X, sizeInput); //
+    //       (A * y_n, A * y_n)
 
     //   double tau = numerator / denumerator;
 
@@ -361,10 +364,10 @@ int main(int argc, char **argv) {
     // printVector(xNext, sizeInput);
   }
 
-  // if (rankOfCurrProc == 0) {
-  //   std::cout << "yFull is: " << std::endl;
-  //   printVector(yFull, sizeInput);
-  // }
+  if (rankOfCurrProc == 0) {
+    std::cout << "yFull is: " << std::endl;
+    printVector(yFull, sizeInput);
+  }
 
   delete[] tmpAMulX;
   delete[] yPart;

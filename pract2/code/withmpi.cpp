@@ -258,9 +258,12 @@ int main(int argc, char **argv) {
   zerofyVectors(yFull, sizeInput);
 
   double *partAY = new double[rowsNum[rankOfCurrProc]];
-  // double *tauY = new double[sizeInput];
-  // double *xNext = new double[sizeInput];
-  // zerofyVectors(xNext, sizeInput);
+  double *tauY = new double[rowsNum[rankOfCurrProc]];
+
+  double *partXNext = new double[rowsNum[rankOfCurrProc]];
+
+  double *xNext = new double[sizeInput];
+  zerofyVectors(xNext, sizeInput);
 
   double *tmpAMulX = new double[sizeInput];
 
@@ -288,9 +291,32 @@ int main(int argc, char **argv) {
 
     parallelMultMatrixOnVector(partMatrA, yFull, partAY,
                                rowsNum[rankOfCurrProc], sizeInput);
-    
 
+    double partScalarY_Ay =
+        countScalarMult(yPart, partAY, rowsNum[rankOfCurrProc]);
+    double numerator;
+    MPI_Reduce(&partScalarY_Ay, &numerator, 1, MPI_DOUBLE, MPI_SUM, 0,
+               MPI_COMM_WORLD);
+    // std::cout << "numerator tau is: " << numerator << std::endl;
 
+    double partScalarAy_Ay =
+        countScalarMult(partAY, partAY, rowsNum[rankOfCurrProc]);
+    double denumerator;
+    MPI_Reduce(&partScalarAy_Ay, &denumerator, 1, MPI_DOUBLE, MPI_SUM,
+               0, MPI_COMM_WORLD);
+    // std::cout << "denumerator tau is: " << denumerator <<
+    // std::endl;
+
+    double tau = numerator / denumerator;
+
+    countVectorMultNumber(yPart, tau, tauY, rowsNum[rankOfCurrProc]);
+
+    parallelSubstrucVectors(xCurr, tauY, partXNext,
+                            rowsNum[rankOfCurrProc]);
+
+    MPI_Allgatherv(partXNext, rowsNum[rankOfCurrProc], MPI_DOUBLE,
+                  xNext, recvCounts, offset, MPI_DOUBLE,
+                  MPI_COMM_WORLD);
 
     //   multimplyMatrixOnVector(fullMatrA, xCurr, partMatrA_X,
     //                           sizeInput);      // A * x_n
@@ -369,6 +395,9 @@ int main(int argc, char **argv) {
     printVector(yFull, sizeInput);
   }
 
+  delete[] partXNext;
+  delete[] tauY;
+  delete[] partAY;
   delete[] tmpAMulX;
   delete[] yPart;
   delete[] yFull;

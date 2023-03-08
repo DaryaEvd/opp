@@ -154,23 +154,9 @@ int main(int argc, char **argv) {
   const int sizeInput = atoi(argv[1]);
   const double epsilon = 1e-10;
 
-  const size_t maxIterationCounts = 100;
+  const size_t maxIterationCounts = 3;
   size_t iterationCounts = 0;
   double tau = 0;
-  // double *fullMatrA = fillRandomMatrix(sizeInput);
-  // double *fullMatrA = fillConstantMatrix(sizeInput);
-  // printMatrix(fullMatrA, sizeInput);
-  // double *b = fillConstantVector(sizeInput);
-  // double *b = fillRandomVector(sizeInput);
-  // std::cout << "vector b is: " << std::endl;
-  // printVector(b, sizeInput);
-  // zerofyVectors(xCurr, sizeInput);
-  // std::cout << "vector X is: " << std::endl;
-  // printVector(xCurr, sizeInput);
-  // std::cout << "matrix A is" << std::endl;
-  // printMatrix(fullMatrA, sizeInput);
-  // std::cout << "vector b is" << std::endl;
-  // printVector(b, sizeInput);
 
   MPI_Init(&argc, &argv);
   double startTime = MPI_Wtime();
@@ -233,7 +219,7 @@ int main(int argc, char **argv) {
   int *offset = new int[amountOfProcs];
   offset[0] = 0;
   for (int i = 1; i < amountOfProcs; i++) {
-    recvCounts[i] = basicRowsCount + (i < restRowsCount);
+    // recvCounts[i] = basicRowsCount + (i < restRowsCount);
     offset[i] = offset[i - 1] + recvCounts[i - 1];
   }
 
@@ -283,8 +269,10 @@ int main(int argc, char **argv) {
 
     MPI_Allgatherv(yPart, rowsNum[rankOfCurrProc], MPI_DOUBLE, yFull,
                    recvCounts, offset, MPI_DOUBLE, MPI_COMM_WORLD);
-    std::cout << "y full is: ";
-    printVector(yFull, sizeInput);
+    if (rankOfCurrProc == 0) {
+      std::cout << "y full is: ";
+      printVector(yFull, sizeInput);
+    }
 
     double yNorm = countVectorLength(sizeInput, yFull);
     if (rankOfCurrProc == 0) {
@@ -330,7 +318,6 @@ int main(int argc, char **argv) {
                 << " ";
     }
 
-
     if (iterationCounts > maxIterationCounts) {
       std::cout << "Too many iterations. Change init values"
                 << std::endl;
@@ -340,6 +327,7 @@ int main(int argc, char **argv) {
       delete[] yPart;
       delete[] yFull;
       delete[] partMatrA;
+      delete[] recvCounts;
       delete[] displs;
       delete[] rowsNum;
       delete[] sendCounts;
@@ -365,7 +353,7 @@ int main(int argc, char **argv) {
       }
     }
     MPI_Bcast(&isContinue, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
-    
+
     if (isContinue == false) {
       break;
     }
@@ -377,6 +365,7 @@ int main(int argc, char **argv) {
     if (rankOfCurrProc == 0) {
       std::cout << "iteration " << iterationCounts
                 << " ended ====" << std::endl;
+      std::cout << std::endl;
     }
   }
 
@@ -399,6 +388,7 @@ int main(int argc, char **argv) {
   delete[] yPart;
   delete[] yFull;
   delete[] partMatrA;
+  delete[] recvCounts;
   delete[] displs;
   delete[] rowsNum;
   delete[] sendCounts;

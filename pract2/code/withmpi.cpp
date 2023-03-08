@@ -131,11 +131,9 @@ void substructVectors(const double *vector1, const double *vector2,
 
 void parallelSubstrucVectors(const double *vector1,
                              const double *vector2, double *res,
-                             const size_t sizeInput,
-                             const int offsetVector1,
-                             const int offsetVector2) {
+                             const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; i++) {
-    res[i] = vector1[offsetVector1 + i] - vector2[offsetVector2 + i];
+    res[i] = vector1[i] - vector2[i];
   }
 }
 
@@ -149,21 +147,6 @@ void copyVectors(const double *src, double *dst,
                  const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; i++) {
     dst[i] = src[i];
-  }
-}
-void subtractVectors(double *resultVector, const double *firstVector,
-                     const double *secondVector,
-                     const size_t firstVectorSize,
-                     const size_t secondVectorSize,
-                     const int firstVectorElementsOffset,
-                     const int secondVectorElementsOffset) {
-  //    if (first_vector_size != second_vector_size) {
-  //        exit(1);
-  //    }
-
-  for (size_t i = 0; i < firstVectorSize; i++) {
-    resultVector[i] = firstVector[firstVectorElementsOffset + i] -
-                      secondVector[secondVectorElementsOffset + i];
   }
 }
 
@@ -230,7 +213,7 @@ int main(int argc, char **argv) {
 
   int *rowsNum = new int[amountOfProcs];
   int *sendCounts = new int[amountOfProcs];
-  // int *recvCounts = new int[amountOfProcs];
+  int *recvCounts = new int[amountOfProcs];
 
   for (int i = 0; i < amountOfProcs; i++) {
     rowsNum[i] = basicRowsCount +
@@ -238,7 +221,8 @@ int main(int argc, char **argv) {
     sendCounts[i] =
         rowsNum[i] * sizeInput; // how many elems in each proc
 
-    // recvCounts[i] = basicRowsCount + (i < restRowsCount);
+    recvCounts[i] = basicRowsCount +
+                 (i < restRowsCount);
   }
 
   int *displs = new int[amountOfProcs];
@@ -246,6 +230,14 @@ int main(int argc, char **argv) {
   for (int i = 1; i < amountOfProcs; i++) {
     displs[i] = displs[i - 1] + sendCounts[i - 1];
   }
+
+  int *offset = new int[amountOfProcs];
+  offset[0] = 0;
+  for(int i = 1; i < amountOfProcs; i++) {
+    recvCounts[i] = basicRowsCount + (i < restRowsCount);
+    offset[i] = offset[i - 1] + recvCounts[i - 1];
+  }
+
 
   double *partMatrA = new double[sendCounts[rankOfCurrProc]];
   MPI_Scatterv(fullMatrA, sendCounts, displs, MPI_DOUBLE, partMatrA,
@@ -260,9 +252,13 @@ int main(int argc, char **argv) {
   int widthPartA = sizeInput;
   int heightPartA = rowsNum[rankOfCurrProc];
 
-  double *tmpMatr_A_X = new double[rowsNum[rankOfCurrProc]];
+  double *partMatrA_X = new double[rowsNum[rankOfCurrProc]];
   double *yPart = new double[rowsNum[rankOfCurrProc]];
+  zerofyVectors(yPart, rowsNum[rankOfCurrProc]);
+
   double *yFull = new double[sizeInput];
+  zerofyVectors(yFull, sizeInput);
+
   double *partAY = new double[rowsNum[rankOfCurrProc]];
   // double *tauY = new double[sizeInput];
   // double *xNext = new double[sizeInput];
@@ -276,48 +272,39 @@ int main(int argc, char **argv) {
     MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     std::cout << "After B cast " << std::endl;
 
-    parallelMultMatrixOnVector(partMatrA, xCurr, tmpMatr_A_X,
+    parallelMultMatrixOnVector(partMatrA, xCurr, partMatrA_X,
                                rowsNum[rankOfCurrProc], sizeInput);
     std::cout << "After mult matrix on vector" << std::endl;
 
-    for(size_t i = 0; i < rowsNum[rankOfCurrProc]; i++) {
-      yPart[i] = tmpMatr_A_X[0 + i] - b[i];
-    }
-
-    // parallelSubstrucVectors(tmpMatr_A_X, b, yPart, heightPartA, 0,
-    //                         displs[rankOfCurrProc]);
-
-    // subtractVectors(yPart, tmpMatr_A_X, b, rowsNum[rankOfCurrProc],
-    //                 rowsNum[rankOfCurrProc], 0,
-    //                 displs[rankOfCurrProc]);
-
-    // MPI_Allgatherv(yPart, heightPartA, MPI_DOUBLE, yFull,
-    //                sendCounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+    parallelSubstrucVectors(partMatrA_X, b, yPart, rowsNum[rankOfCurrProc]);
+     std::cout << "After substru matrix on vector" << std::endl;
+    
+    MPI_Allgatherv(yPart, rowsNum[rankOfCurrProc], MPI_DOUBLE, yFull,
+                   recvCounts, offset, MPI_DOUBLE, MPI_COMM_WORLD);
 
     // double yNorm = countVectorLength(sizeInput, yFull);
     // if(rankOfCurrProc == 0) {
     //    std::cout << "Y norm is: " << yNorm << ",  ";
     // }
-
-
+    
     // parallelMultMatrixOnVector()
 
-    //   multimplyMatrixOnVector(fullMatrA, xCurr, tmpMatr_A_X,
+    //   multimplyMatrixOnVector(fullMatrA, xCurr, partMatrA_X,
     //                           sizeInput);      // A * x_n
-    //   substructVectors(tmpMatr_A_X, b, yPart, sizeInput); // y_n = A *
+    //   substructVectors(partMatrA_X, b, yPart, sizeInput); // y_n = A *
     //   x_n
     //   - b
     //  double yNorm =
     //       countVectorLength(sizeInput, yPart); // || A * x_n - b ||
     //   std::cout << "Y norm is: " << yNorm << ",  ";
-    //   zerofyVectors(tmpMatr_A_X, sizeInput);
-    //   multimplyMatrixOnVector(fullMatrA, yPart, tmpMatr_A_X,
+    //   zerofyVectors(partMatrA_X, sizeInput);
+    //   multimplyMatrixOnVector(fullMatrA, yPart, partMatrA_X,
     //   sizeInput);
     //   // A    //   * y_n double numerator =
-    //       countScalarMult(yPart, tmpMatr_A_X, sizeInput); // (y_n, A *
+    //       countScalarMult(yPart, partMatrA_X, sizeInput); // (y_n, A *
     //       y_n)
     //   double denumerator =
-    //       countScalarMult(tmpMatr_A_X, tmpMatr_A_X, sizeInput); // (A *
+    //       countScalarMult(partMatrA_X, partMatrA_X, sizeInput); // (A *
     //       y_n, A * y_n)
 
     //   double tau = numerator / denumerator;
@@ -338,7 +325,7 @@ int main(int argc, char **argv) {
     //     delete[] sendCounts;
     //     delete[] xCurr;
     //     delete[] xNext;
-    //     delete[] tmpMatr_A_X;
+    //     delete[] partMatrA_X;
     //     delete[] yPart;
     //     delete[] tauY;
     //     delete[] fullMatrA;
@@ -389,7 +376,7 @@ int main(int argc, char **argv) {
 
   delete[] xCurr;
   // delete[] xNext;
-  delete[] tmpMatr_A_X;
+  delete[] partMatrA_X;
   // delete[] tauY;
   delete[] fullMatrA;
   delete[] b;

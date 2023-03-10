@@ -150,6 +150,22 @@ void copyVectors(const double *src, double *dst,
   }
 }
 
+void subtractVectors(double *resultVector, const double *firstVector,
+                     const double *secondVector,
+                     const size_t firstVectorSize,
+                     const size_t secondVectorSize,
+                     const int firstVectorElementsOffset,
+                     const int secondVectorElementsOffset) {
+  //    if (first_vector_size != second_vector_size) {
+  //        exit(1);
+  //    }
+
+  for (size_t i = 0; i < firstVectorSize; i++) {
+    resultVector[i] = firstVector[firstVectorElementsOffset + i] -
+                      secondVector[secondVectorElementsOffset + i];
+  }
+}
+
 int main(int argc, char **argv) {
   const int sizeInput = atoi(argv[1]);
   const double epsilon = 1e-10;
@@ -199,15 +215,25 @@ int main(int argc, char **argv) {
 
   int *rowsNum = new int[amountOfProcs];
   int *sendCounts = new int[amountOfProcs];
-  int *recvCounts = new int[amountOfProcs];
+
+  int *rowStartWith = new int[amountOfProcs];
+  int *elemStartWith = new int[amountOfProcs];
 
   for (int i = 0; i < amountOfProcs; i++) {
     rowsNum[i] = basicRowsCount +
                  (i < restRowsCount); // how many rows in each proc
     sendCounts[i] =
         rowsNum[i] * sizeInput; // how many elems in each proc
+  }
 
-    recvCounts[i] = basicRowsCount + (i < restRowsCount);
+  int elemsOffset = 0;
+  for (size_t i = 0; i < amountOfProcs; i++) {
+    elemStartWith[i] = elemsOffset;
+    elemsOffset += elemStartWith[i];
+  }
+
+  for (size_t i = 0; i < amountOfProcs; i++) {
+    rowStartWith[i] = elemStartWith[i] / sizeInput;
   }
 
   int *displs = new int[amountOfProcs];
@@ -219,8 +245,8 @@ int main(int argc, char **argv) {
   int *offset = new int[amountOfProcs];
   offset[0] = 0;
   for (int i = 1; i < amountOfProcs; i++) {
-    // recvCounts[i] = basicRowsCount + (i < restRowsCount);
-    offset[i] = offset[i - 1] + recvCounts[i - 1];
+    // rowStartWith[i] = basicRowsCount + (i < restRowsCount);
+    offset[i] = offset[i - 1] + rowStartWith[i - 1];
   }
 
   double *partMatrA = new double[sendCounts[rankOfCurrProc]];
@@ -231,7 +257,7 @@ int main(int argc, char **argv) {
   // процессах)
 
   MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  // MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   int widthPartA = sizeInput;
   int heightPartA = rowsNum[rankOfCurrProc];
@@ -255,7 +281,9 @@ int main(int argc, char **argv) {
 
   bool isContinue = true;
 
-  while (1) {
+  int iter = 0;
+  while (iter < 10) {
+    iter++;
     MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     // std::cout << "After B cast " << std::endl;
 
@@ -265,10 +293,15 @@ int main(int argc, char **argv) {
 
     parallelSubstrucVectors(partMatrA_X, b, yPart,
                             rowsNum[rankOfCurrProc]);
+
+    subtractVectors(yPart, b, partMatrA_X, rowsNum[rankOfCurrProc],
+                    rowsNum[rankOfCurrProc], 0,
+                    rowStartWith[rankOfCurrProc]);
+
     // std::cout << "After substru matrix on vector" << std::endl;
 
     MPI_Allgatherv(yPart, rowsNum[rankOfCurrProc], MPI_DOUBLE, yFull,
-                   recvCounts, offset, MPI_DOUBLE, MPI_COMM_WORLD);
+                   rowsNum, rowStartWith, MPI_DOUBLE, MPI_COMM_WORLD);
     if (rankOfCurrProc == 0) {
       std::cout << "y full is: ";
       printVector(yFull, sizeInput);
@@ -287,7 +320,7 @@ int main(int argc, char **argv) {
     double numerator;
     MPI_Reduce(&partScalarY_Ay, &numerator, 1, MPI_DOUBLE, MPI_SUM, 0,
                MPI_COMM_WORLD);
-    // std::cout << "numerator tau is: " << numerator << std::endl;
+    std::cout << "numerator tau is: " << numerator << std::endl;
 
     double partScalarAy_Ay =
         countScalarMult(partAY, partAY, rowsNum[rankOfCurrProc]);
@@ -305,50 +338,57 @@ int main(int argc, char **argv) {
 
     countVectorMultNumber(yPart, tau, tauY, rowsNum[rankOfCurrProc]);
 
-    parallelSubstrucVectors(xCurr, tauY, partXNext,
-                            rowsNum[rankOfCurrProc]);
+    // parallelSubstrucVectors(xCurr, tauY, partXNext,
+    //                         rowsNum[rankOfCurrProc]);
+    subtractVectors(partXNext, xCurr, tauY, rowsNum[rankOfCurrProc],
+                    rowsNum[rankOfCurrProc],
+                    rowStartWith[rankOfCurrProc], 0);
 
     MPI_Allgatherv(partXNext, rowsNum[rankOfCurrProc], MPI_DOUBLE,
-                   xNext, recvCounts, offset, MPI_DOUBLE,
+                   xNext, rowsNum, rowStartWith, MPI_DOUBLE,
                    MPI_COMM_WORLD);
 
-    double endCriteria = yNorm / bNorm;
+    // if (rankOfCurrProc == 0) {
+    //   double endCriteria = yNorm / bNorm;
+    //   std::cout << "endcriteria is: " << std::fixed << endCriteria
+    //             << " ";
+    // }
+
+    // if (iterationCounts > maxIterationCounts) {
+    //   std::cout << "Too many iterations. Change init values"
+    //             << std::endl;
+    //   delete[] partXNext;
+    //   delete[] partAY;
+    //   delete[] tmpAMulX;
+    //   delete[] yPart;
+    //   delete[] yFull;
+    //   delete[] partMatrA;
+    //   delete[] rowStartWith;
+    //   delete[] displs;
+    //   delete[] rowsNum;
+    //   delete[] sendCounts;
+
+    //   delete[] xCurr;
+    //   delete[] xNext;
+    //   delete[] partMatrA_X;
+    //   delete[] tauY;
+    //   delete[] fullMatrA;
+    //   delete[] b;
+
+    //   MPI_Finalize();
+    //   return 0;
+    // }
+
     if (rankOfCurrProc == 0) {
+      double endCriteria = yNorm / bNorm;
       std::cout << "endcriteria is: " << std::fixed << endCriteria
                 << " ";
-    }
-
-    if (iterationCounts > maxIterationCounts) {
-      std::cout << "Too many iterations. Change init values"
-                << std::endl;
-      delete[] partXNext;
-      delete[] partAY;
-      delete[] tmpAMulX;
-      delete[] yPart;
-      delete[] yFull;
-      delete[] partMatrA;
-      delete[] recvCounts;
-      delete[] displs;
-      delete[] rowsNum;
-      delete[] sendCounts;
-
-      delete[] xCurr;
-      delete[] xNext;
-      delete[] partMatrA_X;
-      delete[] tauY;
-      delete[] fullMatrA;
-      delete[] b;
-
-      MPI_Finalize();
-      return 0;
-    }
-
-    if (rankOfCurrProc == 0) {
       if (endCriteria < epsilon) {
         std::cout << "endCriteria < epsilon !!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         isContinue = false;
-        // MPI_Bcast(&isContinue, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+        // MPI_Bcast(&isContinue, 1, MPI_CXX_BOOL, 0,
+        // MPI_COMM_WORLD);
         // break;
       }
     }
@@ -388,7 +428,7 @@ int main(int argc, char **argv) {
   delete[] yPart;
   delete[] yFull;
   delete[] partMatrA;
-  delete[] recvCounts;
+  delete[] rowStartWith;
   delete[] displs;
   delete[] rowsNum;
   delete[] sendCounts;

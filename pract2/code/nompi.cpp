@@ -21,8 +21,8 @@ void printVector(const double *vector, const size_t sizeInput) {
 
 double *fillRandomMatrix(const size_t sizeInput) {
   double *matrixA = new double[sizeInput * sizeInput];
+  srand(0);
   for (size_t i = 0; i < sizeInput; ++i) {
-    // srand(i);
     for (size_t j = 0; j < sizeInput; ++j) {
       if (i == j) {
         matrixA[i * sizeInput + j] = 9999;
@@ -49,11 +49,10 @@ double *fillConstantMatrix(const size_t sizeInput) {
 }
 
 double *fillRandomVector(const size_t sizeInput) {
+  srand(0);
   double *vector = new double[sizeInput];
   for (size_t i = 0; i < sizeInput; ++i) {
-    srand(i);
     vector[i] = rand() % 500;
-    // vector[i] = 300;
   }
   return vector;
 }
@@ -88,8 +87,8 @@ double *fillVectorU(const size_t sizeInput) {
 void fillVectorB(double *b, const double *fullMatrixA,
                  size_t sizeInput) {
   double *vectorU = fillVectorU((int)sizeInput);
-  std::cout << "vector U is: " << std::endl;
-  printVector(vectorU, sizeInput);
+  // std::cout << "vector U is: " << std::endl;
+  // printVector(vectorU, sizeInput);
   multimplyMatrixOnVector(fullMatrixA, vectorU, b, sizeInput);
 
   delete[] vectorU;
@@ -124,7 +123,7 @@ void substructVectors(const double *vector1, const double *vector2,
 }
 
 void copyVector(const double *src, double *dst,
-                 const size_t sizeInput) {
+                const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; i++) {
     dst[i] = src[i];
   }
@@ -140,15 +139,21 @@ int main(int argc, char *argv[]) {
   size_t iterationCounts = 0;
   int convergenceCount = 0;
 
+  double critCurrentEnd = 1;
+  double prevCritEnd = 1;
+  double prevPrevCritEnd = 1;
+
+  bool isEndOfAlgo = false;
+
+  struct timespec endt, startt;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &startt);
+
   double *Atmp = new double[sizeInput];
   double *y = new double[sizeInput];
   double *tauY = new double[sizeInput];
 
   double *xCurr = new double[sizeInput];
   double *xNext = new double[sizeInput];
-
-  double prevEndCrit = 0, endCrit = 0;
-  struct timespec endt, startt;
 
   ///* for testing data with RANDOM values ========= */
   double *matrixA = fillRandomMatrix(sizeInput);
@@ -163,19 +168,18 @@ int main(int argc, char *argv[]) {
 
   ///* for testing when vector b uses sin ========= */
   // double *matrixA = fillConstantMatrix(sizeInput);
-  // printMatrix(matrixA, sizeInput);
+  // // printMatrix(matrixA, sizeInput);
 
   // double *b = new double[sizeInput];
   // fillVectorB(b, matrixA, sizeInput);
-  // std::cout << "vector b is" << std::endl;
-  // printVector(b, sizeInput);
+  // // std::cout << "vector b is" << std::endl;
+  // // printVector(b, sizeInput);
 
   // std::fill(xCurr, xCurr + sizeInput, 0);
-  // std::cout << "vector X at start is: " << std::endl;
-  // printVector(xCurr, sizeInput);   
+  // // std::cout << "vector X at start is: " << std::endl;
+  // // printVector(xCurr, sizeInput);
   ///* for testing when vector b uses sin ========= */
 
-  clock_gettime(CLOCK_MONOTONIC_RAW, &startt);
   double bNorm = countVectorLength(sizeInput, b);
 
   while (1) {
@@ -187,20 +191,19 @@ int main(int argc, char *argv[]) {
 
     std::fill(Atmp, Atmp + sizeInput, 0);
     multimplyMatrixOnVector(matrixA, y, Atmp, sizeInput); // A * y_n
-    double numerator =
+    double numeratorTau =
         countScalarMult(y, Atmp, sizeInput); // (y_n, A * y_n)
-    double denumerator =
+    double denominatorTau =
         countScalarMult(Atmp, Atmp, sizeInput); // (A * y_n, A * y_n)
 
-    double tau = numerator / denumerator;
+    double tau = numeratorTau / denominatorTau;
 
     countVectorMultNumber(y, tau, tauY, sizeInput); // tau * y
     substructVectors(xCurr, tauY, xNext,
                      sizeInput); // x_n+1 = x_n - tau * y
 
-    double endCriteria = yNorm / bNorm;
-    // std::cout << "endcrit is: " << std::fixed << endCriteria << "
-    // ";
+    double critCurrentEnd = yNorm / bNorm;
+
     if (iterationCounts > maxIterationCounts) {
       std::cout << "Too many iterations. Change init values"
                 << std::endl;
@@ -214,27 +217,18 @@ int main(int argc, char *argv[]) {
 
       return 0;
     }
-    if (endCriteria < epsilon) {
-      std::cout << "endCriteria < epsilon !!!!!!!!!!!!!!!!!!!!"
-                << std::endl;
-      break;
-    }
+    if (critCurrentEnd < epsilon && critCurrentEnd < prevCritEnd &&
+        critCurrentEnd < prevPrevCritEnd) {
 
-    if (convergenceCount > maxConvergenceCount) {
-      std::cout << "convergenceCount > maxConvergenceCount "
-                   "!!!!!!!!!!!!!!!!!!!!"
-                << std::endl;
+      isEndOfAlgo = true;
       break;
-    } else if (endCriteria < prevEndCrit) {
-      std::cout << "I'm in endCrit < prevEndCrit" << std::endl;
-      convergenceCount++;
-    } else if (endCriteria > prevEndCrit) {
-      std::cout << "I'm in endCrit > prevEndCrit" << std::endl;
-      convergenceCount = 0;
     }
 
     copyVector(xNext, xCurr, sizeInput);
-    prevEndCrit = endCrit;
+
+    prevPrevCritEnd = prevCritEnd;
+    prevCritEnd = critCurrentEnd;
+
     iterationCounts++;
 
     std::cout << "iteration " << iterationCounts
@@ -243,24 +237,20 @@ int main(int argc, char *argv[]) {
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
 
-  if (convergenceCount <= maxConvergenceCount) {
+  if (isEndOfAlgo) {
     std::cout << "Iteration amount in total: " << iterationCounts
-              << "\n";
+              << std::endl;
+    std::cout << "Time taken: "
+              << endt.tv_sec - startt.tv_sec +
+                     accuracy * (endt.tv_nsec - startt.tv_nsec)
+              << " sec" << std::endl;
+
+    // std::cout << "Solution (vector X is): " << std::endl;
+    // printVector(xNext, sizeInput);
 
   } else {
-    std::cout << "There are no solutions!\n";
+    std::cout << "There are no solutions =( Change input \n";
   }
-
-  clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
-
-  std::cout << "Time taken: "
-            << endt.tv_sec - startt.tv_sec +
-                   accuracy * (endt.tv_nsec - startt.tv_nsec)
-            << " sec";
-  std::cout << std::endl;
-
-  // std::cout << "Solution (vector x is): " << std::endl;
-  // printVector(xNext, sizeInput);
 
   delete[] xCurr;
   delete[] xNext;

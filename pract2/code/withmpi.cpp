@@ -108,11 +108,11 @@ void countVectorMultNumber(const double *vector, double scalar,
 
 void subtractVectors(const double *vector1, const double *vector2,
                      double *res, const size_t firstVectorSize,
-                     const int firstVectorElementsOffset,
-                     const int secondVectorElementsOffset) {
+                     const int vector1ElementsOffset,
+                     const int vector2ElementsOffset) {
   for (size_t i = 0; i < firstVectorSize; i++) {
-    res[i] = vector1[firstVectorElementsOffset + i] -
-             vector2[secondVectorElementsOffset + i];
+    res[i] = vector1[vector1ElementsOffset + i] -
+             vector2[vector2ElementsOffset + i];
   }
 }
 
@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
    * @param recvbuf [out] - address of reciever buffer's starting
    * @param recvcounts - amount of elems that we recieve
    * @param recvtype - type of receiving data
-   * @param root - number of provess-reciever
+   * @param root - number of proсess-reciever
    * @param Comm - communicator
    */
   MPI_Scatterv(fullMatrA, elemsNum, elementsOffsetArray, MPI_DOUBLE,
@@ -279,6 +279,9 @@ int main(int argc, char **argv) {
       new double[rowsNum[rankOfCurrProc]];
   double *vectorY = new double[sizeInput];
   double *xNext = new double[sizeInput];
+
+  // int widthMatrixPart = sizeInput;
+  // int heightMatrixPart = rowsNum[rankOfCurrProc];
 
   while (1) {
     MPI_Bcast(xCurr, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -317,9 +320,7 @@ int main(int argc, char **argv) {
     // || A * x_n - b ||
     double yNorm = 0;
     if (rankOfCurrProc == 0) {
-      double squareMetricVectorY =
-          countScalarMult(vectorY, vectorY, sizeInput);
-      yNorm = sqrt(squareMetricVectorY);
+      yNorm = countVectorLength(vectorY, sizeInput);
     }
 
     // start counting tau
@@ -334,6 +335,15 @@ int main(int argc, char **argv) {
     double partScalarProduct_AyAy = countScalarMult(
         partMultResultVector_Ay, partMultResultVector_Ay,
         rowsNum[rankOfCurrProc]);
+    
+    /** MPI_Allreduce - combines values from all processes and distributes the result back to all processes
+     * @param sendbuf - starting address of send buffer
+     * @param recvbuf - starting address of receive buffer 
+     * @param count - number of elements in send buffer
+     * @param datatype - data type of elements of send buffer 
+     * @param op - operation
+     * @param comm - communicator
+    */    
     // (A * y_n, A * y_n)
     MPI_Allreduce(&partScalarProduct_AyAy, &denominatorTau, 1,
                MPI_DOUBLE, MPI_SUM,  MPI_COMM_WORLD);
@@ -380,7 +390,7 @@ int main(int argc, char **argv) {
     if (rankOfCurrProc == 0) {
       iterationCounts++;
     }
-
+    
     MPI_Bcast(&iterationCounts, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // if (rankOfCurrProc == 0) {

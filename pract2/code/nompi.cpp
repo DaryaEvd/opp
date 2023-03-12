@@ -130,6 +130,9 @@ void copyVector(const double *src, double *dst,
 }
 
 int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    std::cout << "Bad input! Enter matrix size" << std::endl;
+  }
   const size_t sizeInput = atoi(argv[1]);
   const double accuracy = 1e-10;
   const double epsilon = 1e-10;

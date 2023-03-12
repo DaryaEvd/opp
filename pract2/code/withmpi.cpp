@@ -168,7 +168,9 @@ int *createRowsOffsetArr(const int *elementsOffsetArray,
 }
 
 int main(int argc, char **argv) {
-
+  if (argc != 2) {
+    std::cout << "Bad input! Enter matrix size" << std::endl;
+  }
   const size_t sizeInput = atoi(argv[1]);
   const double epsilon = 10e-10;
 
@@ -199,7 +201,7 @@ int main(int argc, char **argv) {
   //   fillConstantMatrix(fullMatrA, sizeInput);
   //   // printMatrix(fullMatrA, sizeInput);
 
-  //   fillVectorB(b, fullMatrA, sizeInput); 
+  //   fillVectorB(b, fullMatrA, sizeInput);
 
   //   std::fill(xCurr, xCurr + sizeInput, 0);
   //   // std::cout << "vector X at start is: " << std::endl;
@@ -245,7 +247,6 @@ int main(int argc, char **argv) {
   int *rowsOffsetArray = createRowsOffsetArr(
       elementsOffsetArray, amountOfProcs, sizeInput);
 
-  
   double *partMatrA = new double[elemsNum[rankOfCurrProc]];
 
   /*** MPI_Scatterv - рапределяет блоки данных по всем процессам
@@ -327,16 +328,16 @@ int main(int argc, char **argv) {
         countScalarMult(partVectorY, partMultResultVector_Ay,
                         rowsNum[rankOfCurrProc]);
     // (y_n, A * y_n)
-    MPI_Reduce(&partScalarProduct_YAy, &numeratorTau, 1, MPI_DOUBLE,
-               MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Allreduce(&partScalarProduct_YAy, &numeratorTau, 1, MPI_DOUBLE,
+               MPI_SUM, MPI_COMM_WORLD);
 
     double partScalarProduct_AyAy = countScalarMult(
         partMultResultVector_Ay, partMultResultVector_Ay,
         rowsNum[rankOfCurrProc]);
     // (A * y_n, A * y_n)
-    MPI_Reduce(&partScalarProduct_AyAy, &denominatorTau, 1,
-               MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
+    MPI_Allreduce(&partScalarProduct_AyAy, &denominatorTau, 1,
+               MPI_DOUBLE, MPI_SUM,  MPI_COMM_WORLD);
+ 
     if (rankOfCurrProc == 0) {
       tau = numeratorTau / denominatorTau;
     }
@@ -382,10 +383,10 @@ int main(int argc, char **argv) {
 
     MPI_Bcast(&iterationCounts, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    if (rankOfCurrProc == 0) {
-      std::cout << "iteration " << iterationCounts
-                << " ended ====" << std::endl;
-    }
+    // if (rankOfCurrProc == 0) {
+    //   std::cout << "iteration " << iterationCounts
+    //             << " ended ====" << std::endl;
+    // }
   }
 
   double endTime = MPI_Wtime();

@@ -80,8 +80,7 @@ void fillVectorB(double *b, const double *fullMatrixA,
   printVector(u, sizeInput);
 
   multimplyMatrixOnVector(fullMatrixA, u, b, sizeInput, sizeInput);
-  std::cout << "vector b is: " << std::endl;
-  printVector(b, sizeInput);
+
   delete[] u;
 }
 
@@ -171,7 +170,7 @@ int *createRowsOffsetArr(const int *elementsOffsetArray,
 int main(int argc, char **argv) {
 
   const size_t sizeInput = atoi(argv[1]);
-  const double epsilon = 10e-7;
+  const double epsilon = 10e-10;
 
   double critCurrentEnd = 1;
   double prevCritEnd = 1;
@@ -195,19 +194,20 @@ int main(int argc, char **argv) {
   double *b = new double[sizeInput];
   double *xCurr = new double[sizeInput];
 
+  ///* for testing when vector b uses sin ========= */
   // if (rankOfCurrProc == 0) {
   //   fillConstantMatrix(fullMatrA, sizeInput);
   //   // printMatrix(fullMatrA, sizeInput);
 
-  //   fillVectorB(b, fullMatrA, sizeInput);
-  //   // std::cout << "vector b is: " << std::endl;
-  //   // printVector(b, sizeInput);
+  //   fillVectorB(b, fullMatrA, sizeInput); 
 
   //   std::fill(xCurr, xCurr + sizeInput, 0);
   //   // std::cout << "vector X at start is: " << std::endl;
   //   // printVector(xCurr, sizeInput);
   // }
+  ///* for testing when vector b uses sin ========= */
 
+  ///* for testing data with RANDOM values ========= */
   if (rankOfCurrProc == 0) {
     fillRandomMatrix(fullMatrA, sizeInput);
     // printMatrix(fullMatrA, sizeInput);
@@ -220,12 +220,14 @@ int main(int argc, char **argv) {
     // std::cout << "vector X at start is: " << std::endl;
     // printVector(xCurr, sizeInput);
   }
+  ///* for testing data with RANDOM values ========= */
 
   double bNorm;
   if (rankOfCurrProc == 0) {
     bNorm = sqrt(countScalarMult(b, b, sizeInput));
   }
 
+  // sends a message from root to all group process, including itself
   MPI_Bcast(b, sizeInput, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   // amount of elems, handling each process
@@ -243,7 +245,25 @@ int main(int argc, char **argv) {
   int *rowsOffsetArray = createRowsOffsetArr(
       elementsOffsetArray, amountOfProcs, sizeInput);
 
+  
   double *partMatrA = new double[elemsNum[rankOfCurrProc]];
+
+  /*** MPI_Scatterv - рапределяет блоки данных по всем процессам
+   * @param sendbuf [in] - address of send buffer (significant only at
+   * root)
+   * @param sendcounts [in] - array (=group size)
+   * specifying the number of elements to send to each processor
+   * @param displs [in] - array (=group size).
+   * Entry i specifies the displacement (relative to sendbuf from
+   * which to take the outgoing data to process i)
+   * i-oe значение посылает данные в i-й блок
+   * @param sendtype - type of sending data
+   * @param recvbuf [out] - address of reciever buffer's starting
+   * @param recvcounts - amount of elems that we recieve
+   * @param recvtype - type of receiving data
+   * @param root - number of provess-reciever
+   * @param Comm - communicator
+   */
   MPI_Scatterv(fullMatrA, elemsNum, elementsOffsetArray, MPI_DOUBLE,
                partMatrA, elemsNum[rankOfCurrProc], MPI_DOUBLE, 0,
                MPI_COMM_WORLD);
@@ -269,6 +289,20 @@ int main(int argc, char **argv) {
                     rowsNum[rankOfCurrProc], 0,
                     rowsOffsetArray[rankOfCurrProc]);
 
+    /*** MPI_Allgatherv - собирает блоки с разным числом элементов от
+   каждого процесса
+   * @param sendbuf [in] - starting address of send buffer
+   * @param sendcounts [in] - amount of elems in send buffer
+   * @param sendtype - data type of send buffer elements
+   * @param recvbuf [out] - address of receive buffer
+   * @param recvcounts - array (=group size) containing the number of
+   elements that are to be received from each process
+   * @param displs - array (=group size). Entry i
+   specifies the displacement (relative to recvbuf) at which to place
+   the incoming data from process i
+   * @param recvtype - data type of recieve buffer elements
+   * @param Comm - communicator
+   */
     // y_n = A * x_n - b
     MPI_Allgatherv(partVectorY, rowsNum[rankOfCurrProc], MPI_DOUBLE,
                    vectorY, rowsNum, rowsOffsetArray, MPI_DOUBLE,

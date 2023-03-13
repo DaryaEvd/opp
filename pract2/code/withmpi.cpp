@@ -199,13 +199,13 @@ int main(int argc, char **argv) {
   ///* for testing when vector b uses sin ========= */
   // if (rankOfCurrProc == 0) {
   //   fillConstantMatrix(fullMatrA, sizeInput);
-  //   // printMatrix(fullMatrA, sizeInput);
+  //   printMatrix(fullMatrA, sizeInput);
 
   //   fillVectorB(b, fullMatrA, sizeInput);
 
   //   std::fill(xCurr, xCurr + sizeInput, 0);
-  //   // std::cout << "vector X at start is: " << std::endl;
-  //   // printVector(xCurr, sizeInput);
+  //   std::cout << "vector X at start is: " << std::endl;
+  //   printVector(xCurr, sizeInput);
   // }
   ///* for testing when vector b uses sin ========= */
 
@@ -348,10 +348,10 @@ int main(int argc, char **argv) {
     MPI_Allreduce(&partScalarProduct_AyAy, &denominatorTau, 1,
                MPI_DOUBLE, MPI_SUM,  MPI_COMM_WORLD);
  
-    if (rankOfCurrProc == 0) {
+    // if (rankOfCurrProc == 0) {
       tau = numeratorTau / denominatorTau;
-    }
-    MPI_Bcast(&tau, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // }
+    // MPI_Bcast(&tau, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     countVectorMultNumber(partVectorY, tau,
                           partMultVectorByScalar_TauY,
@@ -367,15 +367,18 @@ int main(int argc, char **argv) {
                    MPI_COMM_WORLD);
 
     critCurrentEnd = yNorm / bNorm;
-    if (rankOfCurrProc == 0) {
+
+    // if (rankOfCurrProc == 0) {
       if (critCurrentEnd < epsilon && critCurrentEnd < prevCritEnd &&
           critCurrentEnd < prevPrevCritEnd) {
         isEndOfAlgo = true;
+        // break;
       }
       if (iterationCounts > maxIterationCounts) {
         isEndOfAlgo = true;
+        // break;
       }
-    }
+    // }
     MPI_Bcast(&isEndOfAlgo, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
     if (isEndOfAlgo) {
@@ -387,11 +390,11 @@ int main(int argc, char **argv) {
     prevPrevCritEnd = prevCritEnd;
     prevCritEnd = critCurrentEnd;
 
-    if (rankOfCurrProc == 0) {
+    // if (rankOfCurrProc == 0) {
       iterationCounts++;
-    }
+    // }
     
-    MPI_Bcast(&iterationCounts, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // MPI_Bcast(&iterationCounts, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // if (rankOfCurrProc == 0) {
     //   std::cout << "iteration " << iterationCounts
@@ -400,22 +403,26 @@ int main(int argc, char **argv) {
   }
 
   double endTime = MPI_Wtime();
-  if (rankOfCurrProc == 0) {
+  // if (rankOfCurrProc == 0) {
     if (iterationCounts < maxIterationCounts) {
+       if (rankOfCurrProc == 0) {
       std::cout << "Iteration amount in total: " << iterationCounts
                 << std::endl;
       std::cout << "Time taken: " << endTime - startTime << " sec"
                 << std::endl;
       // std::cout << "Solution (vector X is): " << std::endl;
       // printVector(xCurr, sizeInput);
+       }
     }
 
     else {
+      if (rankOfCurrProc == 0) {
       std::cout << "There are no solutions =( Change input \n";
+      }
     }
 
     delete[] fullMatrA;
-  }
+  // }
 
   delete[] partMatrA;
   delete[] partMultVectorByScalar_TauY;

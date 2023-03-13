@@ -21,7 +21,7 @@ void printVector(const double *vector, const size_t sizeInput) {
 
 double *fillRandomMatrix(const size_t sizeInput) {
   double *matrixA = new double[sizeInput * sizeInput];
-  srand(0);
+  // srand(0);
   for (size_t i = 0; i < sizeInput; ++i) {
     for (size_t j = 0; j < sizeInput; ++j) {
       if (i == j) {
@@ -49,7 +49,7 @@ double *fillConstantMatrix(const size_t sizeInput) {
 }
 
 double *fillRandomVector(const size_t sizeInput) {
-  srand(0);
+  // srand(0);
   double *vector = new double[sizeInput];
   for (size_t i = 0; i < sizeInput; ++i) {
     vector[i] = rand() % 500;
@@ -133,14 +133,14 @@ int main(int argc, char *argv[]) {
   if (argc != 2) {
     std::cout << "Bad input! Enter matrix size" << std::endl;
   }
+  srand(0);
+
   const size_t sizeInput = atoi(argv[1]);
-  const double accuracy = 1e-10;
+  const double precision = 1e-10;
   const double epsilon = 1e-10;
 
   const size_t maxIterationCounts = 50000;
-  const size_t maxConvergenceCount = 5;
   size_t iterationCounts = 0;
-  int convergenceCount = 0;
 
   double critCurrentEnd = 1;
   double prevCritEnd = 1;
@@ -234,8 +234,8 @@ int main(int argc, char *argv[]) {
 
     iterationCounts++;
 
-    std::cout << "iteration " << iterationCounts
-              << " ended ===" << std::endl;
+    // std::cout << "iteration " << iterationCounts
+    //           << " ended ===" << std::endl;
   }
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
               << std::endl;
     std::cout << "Time taken: "
               << endt.tv_sec - startt.tv_sec +
-                     accuracy * (endt.tv_nsec - startt.tv_nsec)
+                     precision * (endt.tv_nsec - startt.tv_nsec)
               << " sec" << std::endl;
 
     // std::cout << "Solution (vector X is): " << std::endl;

@@ -21,8 +21,6 @@ void printVector(const double *vector, const size_t sizeInput) {
 }
 
 void fillRandomMatrix(double *fullMatrA, size_t sizeInput) {
-  srand(0);
-
   for (size_t i = 0; i < sizeInput; i++) {
     for (size_t j = 0; j < sizeInput; j++) {
       fullMatrA[i * sizeInput + j] =
@@ -40,8 +38,6 @@ void fillConstantMatrix(double *fullMatrA, size_t sizeInput) {
 }
 
 void fillRandomVector(double *vector, size_t sizeInput) {
-  srand(0);
-
   for (size_t i = 0; i < sizeInput; i++) {
     vector[i] = rand() % 500;
   }
@@ -171,6 +167,8 @@ int main(int argc, char **argv) {
   if (argc != 2) {
     std::cout << "Bad input! Enter matrix size" << std::endl;
   }
+  srand(0);
+
   const size_t sizeInput = atoi(argv[1]);
   const double epsilon = 10e-10;
 
@@ -178,12 +176,9 @@ int main(int argc, char **argv) {
   double prevCritEnd = 1;
   double prevPrevCritEnd = 1;
 
-  double tau;
   bool isEndOfAlgo = false;
   size_t iterationCounts = 0;
   const size_t maxIterationCounts = 50000;
-  int convergenceCount = 0;
-  const size_t maxConvergenceCount = 5;
 
   MPI_Init(&argc, &argv);
   double startTime = MPI_Wtime();
@@ -226,7 +221,7 @@ int main(int argc, char **argv) {
 
   double bNorm;
   if (rankOfCurrProc == 0) {
-    bNorm = sqrt(countScalarMult(b, b, sizeInput));
+    bNorm = countVectorLength(b, sizeInput);
   }
 
   // sends a message from root to all group process, including itself
@@ -329,29 +324,27 @@ int main(int argc, char **argv) {
         countScalarMult(partVectorY, partMultResultVector_Ay,
                         rowsNum[rankOfCurrProc]);
     // (y_n, A * y_n)
-    MPI_Allreduce(&partScalarProduct_YAy, &numeratorTau, 1, MPI_DOUBLE,
-               MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&partScalarProduct_YAy, &numeratorTau, 1,
+                  MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     double partScalarProduct_AyAy = countScalarMult(
         partMultResultVector_Ay, partMultResultVector_Ay,
         rowsNum[rankOfCurrProc]);
-    
-    /** MPI_Allreduce - combines values from all processes and distributes the result back to all processes
+
+    /** MPI_Allreduce - combines values from all processes and
+     * distributes the result back to all processes
      * @param sendbuf - starting address of send buffer
-     * @param recvbuf - starting address of receive buffer 
+     * @param recvbuf - starting address of receive buffer
      * @param count - number of elements in send buffer
-     * @param datatype - data type of elements of send buffer 
+     * @param datatype - data type of elements of send buffer
      * @param op - operation
      * @param comm - communicator
-    */    
+     */
     // (A * y_n, A * y_n)
     MPI_Allreduce(&partScalarProduct_AyAy, &denominatorTau, 1,
-               MPI_DOUBLE, MPI_SUM,  MPI_COMM_WORLD);
- 
-    // if (rankOfCurrProc == 0) {
-      tau = numeratorTau / denominatorTau;
-    // }
-    // MPI_Bcast(&tau, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                  MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    double tau = numeratorTau / denominatorTau;
 
     countVectorMultNumber(partVectorY, tau,
                           partMultVectorByScalar_TauY,
@@ -368,17 +361,13 @@ int main(int argc, char **argv) {
 
     critCurrentEnd = yNorm / bNorm;
 
-    // if (rankOfCurrProc == 0) {
-      if (critCurrentEnd < epsilon && critCurrentEnd < prevCritEnd &&
-          critCurrentEnd < prevPrevCritEnd) {
-        isEndOfAlgo = true;
-        // break;
-      }
-      if (iterationCounts > maxIterationCounts) {
-        isEndOfAlgo = true;
-        // break;
-      }
-    // }
+    if (critCurrentEnd < epsilon && critCurrentEnd < prevCritEnd &&
+        critCurrentEnd < prevPrevCritEnd) {
+      isEndOfAlgo = true;
+    }
+    if (iterationCounts > maxIterationCounts) {
+      isEndOfAlgo = true;
+    }
     MPI_Bcast(&isEndOfAlgo, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
     if (isEndOfAlgo) {
@@ -390,11 +379,7 @@ int main(int argc, char **argv) {
     prevPrevCritEnd = prevCritEnd;
     prevCritEnd = critCurrentEnd;
 
-    // if (rankOfCurrProc == 0) {
-      iterationCounts++;
-    // }
-    
-    // MPI_Bcast(&iterationCounts, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    iterationCounts++;
 
     // if (rankOfCurrProc == 0) {
     //   std::cout << "iteration " << iterationCounts
@@ -403,27 +388,24 @@ int main(int argc, char **argv) {
   }
 
   double endTime = MPI_Wtime();
-  // if (rankOfCurrProc == 0) {
-    if (iterationCounts < maxIterationCounts) {
-       if (rankOfCurrProc == 0) {
+  if (iterationCounts < maxIterationCounts) {
+    if (rankOfCurrProc == 0) {
       std::cout << "Iteration amount in total: " << iterationCounts
                 << std::endl;
       std::cout << "Time taken: " << endTime - startTime << " sec"
                 << std::endl;
       // std::cout << "Solution (vector X is): " << std::endl;
       // printVector(xCurr, sizeInput);
-       }
     }
+  }
 
-    else {
-      if (rankOfCurrProc == 0) {
+  else {
+    if (rankOfCurrProc == 0) {
       std::cout << "There are no solutions =( Change input \n";
-      }
     }
+  }
 
-    delete[] fullMatrA;
-  // }
-
+  delete[] fullMatrA;
   delete[] partMatrA;
   delete[] partMultVectorByScalar_TauY;
   delete[] partVectorY;

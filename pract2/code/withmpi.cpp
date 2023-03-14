@@ -385,6 +385,7 @@ int main(int argc, char **argv) {
     //   std::cout << "iteration " << iterationCounts
     //             << " ended ====" << std::endl;
     // }
+    
   }
 
   double endTime = MPI_Wtime();

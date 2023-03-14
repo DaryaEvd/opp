@@ -21,7 +21,6 @@ void printVector(const double *vector, const size_t sizeInput) {
 
 double *fillRandomMatrix(const size_t sizeInput) {
   double *matrixA = new double[sizeInput * sizeInput];
-  // srand(0);
   for (size_t i = 0; i < sizeInput; ++i) {
     for (size_t j = 0; j < sizeInput; ++j) {
       if (i == j) {
@@ -49,7 +48,6 @@ double *fillConstantMatrix(const size_t sizeInput) {
 }
 
 double *fillRandomVector(const size_t sizeInput) {
-  // srand(0);
   double *vector = new double[sizeInput];
   for (size_t i = 0; i < sizeInput; ++i) {
     vector[i] = rand() % 500;

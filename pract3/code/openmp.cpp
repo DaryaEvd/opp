@@ -81,6 +81,27 @@ void multimplyMatrixOnVector(const double *matrix,
   }
 }
 
+/*============ only for test starts ============*/
+/* for testing when vector b uses sin*/
+double *fillVectorU(const size_t sizeInput) {
+  double *vector = new double[sizeInput];
+  for (size_t i = 0; i < sizeInput; ++i) {
+    vector[i] = sin(2 * 3.1415 * i / sizeInput);
+  }
+  return vector;
+}
+
+void fillVectorB(double *b, const double *fullMatrixA,
+                 size_t sizeInput) {
+  double *vectorU = fillVectorU((int)sizeInput);
+  std::cout << "vector U is: " << std::endl;
+  printVector(vectorU, sizeInput);
+  multimplyMatrixOnVector(fullMatrixA, vectorU, b, sizeInput);
+
+  delete[] vectorU;
+}
+/*============ only for test ended ============*/
+
 void countScalarMult(const double *vector1, const double *vector2,
                      const size_t sizeInput, double *res) {
 #pragma omp single
@@ -133,13 +154,16 @@ void copyVector(const double *src, double *dst,
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
+  // In this code the 1st arg is sizeMatrix 
+  // the 2nd arg is amount of threads 
+  
+  if (argc != 3) {
     std::cout << "Bad input! Enter matrix size" << std::endl;
   }
   srand(0);
 
   const size_t sizeInput = atoi(argv[1]);
-  // int numOfThreads = atoi(argv[2]);
+  const int amountOfThreads = atoi(argv[2]);
 
   const double precision = 1e-10;
   const double epsilon = 1e-10;
@@ -153,8 +177,6 @@ int main(int argc, char *argv[]) {
 
   bool isEndOfAlgo = false;
 
-  // struct timespec endt, startt;
-  // clock_gettime(CLOCK_MONOTONIC_RAW, &startt);
   double startt = omp_get_wtime();
 
   double *Atmp = new double[sizeInput];
@@ -164,7 +186,7 @@ int main(int argc, char *argv[]) {
   double *xCurr = new double[sizeInput];
   double *xNext = new double[sizeInput];
 
-  ///* for testing data with RANDOM values ========= */
+  ///* for testing data with RANDOM values starts ========= */
   double *matrixA = fillRandomMatrix(sizeInput);
   // printMatrix(matrixA, sizeInput);
   double *b = fillRandomVector(sizeInput);
@@ -173,16 +195,28 @@ int main(int argc, char *argv[]) {
   std::fill(xCurr, xCurr + sizeInput, 0);
   // std::cout << "vector X at start is: " << std::endl;
   // printVector(xCurr, sizeInput);
-  ///* for testing data with RANDOM values ========= */
+  ///* for testing data with RANDOM values ended ========= */
 
-  double bNorm;
+  ///* for testing when vector b uses sin starts ========= */
+  // double *matrixA = fillConstantMatrix(sizeInput);
+  // // printMatrix(matrixA, sizeInput);
+
+  // double *b = new double[sizeInput];
+  // fillVectorB(b, matrixA, sizeInput);
+  // // std::cout << "vector b is" << std::endl;
+  // // printVector(b, sizeInput);
+
+  // std::fill(xCurr, xCurr + sizeInput, 0);
+  // // std::cout << "vector X at start is: " << std::endl;
+  // // printVector(xCurr, sizeInput);
+  ///* for testing when vector b uses sin ended ========= */
+
+  double bNorm, yNorm;
   countVectorLength(sizeInput, b, &bNorm);
-  double yNorm;
-  double numeratorTau;
-  double denominatorTau;
 
-#pragma omp parallel num_threads(1)
+  double numeratorTau, denominatorTau;
 
+#pragma omp parallel num_threads(amountOfThreads)
   {
     while (1) {
       multimplyMatrixOnVector(matrixA, xCurr, Atmp,
@@ -238,13 +272,12 @@ int main(int argc, char *argv[]) {
 
 #pragma omp single
       iterationCounts++;
+
 #pragma omp barrier
 
-      // std::cout << "iteration " << iterationCounts
-      //           << " ended ===" << std::endl;
     }
   }
-  // clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
+
   double endt = omp_get_wtime();
 
   if (isEndOfAlgo) {

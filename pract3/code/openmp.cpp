@@ -67,52 +67,45 @@ double *fillConstantVector(const size_t sizeInput) {
 void multimplyMatrixOnVector(const double *matrix,
                              const double *vector, double *res,
                              const size_t sizeInput) {
-
 #pragma omp for
-  for (size_t i = 0; i < sizeInput; i++) {
+  for (int i = 0; i < sizeInput; i++) {
     res[i] = 0;
   }
-
-#pragma omp parallel for collapse(2)
+#pragma omp for collapse(2)
   for (size_t i = 0; i < sizeInput; ++i) {
-    // res[i] = 0;
     for (size_t j = 0; j < sizeInput; ++j) {
+#pragma omp atomic
+
       res[i] += matrix[i * sizeInput + j] * vector[j];
     }
   }
 }
 
-double *fillVectorU(const size_t sizeInput) {
-  double *vector = new double[sizeInput];
+void countScalarMult(const double *vector1, const double *vector2,
+                     const size_t sizeInput, double *res) {
+#pragma omp single
+  { *res = 0; }
+#pragma omp barrier
+
+#pragma omp for reduction(+ : res[0])
   for (size_t i = 0; i < sizeInput; ++i) {
-    vector[i] = sin(2 * 3.1415 * i / sizeInput);
+    *res += vector1[i] * vector2[i];
   }
-  return vector;
 }
 
-void fillVectorB(double *b, const double *fullMatrixA,
-                 size_t sizeInput) {
-  double *vectorU = fillVectorU((int)sizeInput);
-  // std::cout << "vector U is: " << std::endl;
-  // printVector(vectorU, sizeInput);
-  multimplyMatrixOnVector(fullMatrixA, vectorU, b, sizeInput);
+void countVectorLength(const size_t sizeInput, const double *vector,
+                       double *res) {
+#pragma omp single
+  { *res = 0; }
+#pragma omp barrier
 
-  delete[] vectorU;
-}
-
-double countScalarMult(const double *vector1, const double *vector2,
-                       const size_t sizeInput) {
-  double res = 0;
-#pragma omp parallel for reduction(+ : res)
+#pragma omp for reduction(+ : res[0])
   for (size_t i = 0; i < sizeInput; ++i) {
-    res += vector1[i] * vector2[i];
+    *res += vector[i] * vector[i];
   }
-  return res;
-}
-
-double countVectorLength(const size_t sizeInput,
-                         const double *vector) {
-  return sqrt(countScalarMult(vector, vector, sizeInput));
+#pragma omp single
+  { *res = sqrt(*res); }
+#pragma omp barrier
 }
 
 void countVectorMultNumber(const double *vector, double scalar,
@@ -133,20 +126,20 @@ void substructVectors(const double *vector1, const double *vector2,
 
 void copyVector(const double *src, double *dst,
                 const size_t sizeInput) {
+#pragma omp for
   for (size_t i = 0; i < sizeInput; i++) {
     dst[i] = src[i];
   }
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    std::cout << "Bad input! Enter matrix size and threads amount"
-              << std::endl;
+  if (argc != 2) {
+    std::cout << "Bad input! Enter matrix size" << std::endl;
   }
   srand(0);
 
   const size_t sizeInput = atoi(argv[1]);
-  const int amontOfThreads = atoi(argv[2]);
+  // int numOfThreads = atoi(argv[2]);
 
   const double precision = 1e-10;
   const double epsilon = 1e-10;
@@ -160,8 +153,9 @@ int main(int argc, char *argv[]) {
 
   bool isEndOfAlgo = false;
 
-  double startt, endt;
-  startt = omp_get_wtime();
+  // struct timespec endt, startt;
+  // clock_gettime(CLOCK_MONOTONIC_RAW, &startt);
+  double startt = omp_get_wtime();
 
   double *Atmp = new double[sizeInput];
   double *y = new double[sizeInput];
@@ -181,44 +175,32 @@ int main(int argc, char *argv[]) {
   // printVector(xCurr, sizeInput);
   ///* for testing data with RANDOM values ========= */
 
-  ///* for testing when vector b uses sin ========= */
-  // double *matrixA = fillConstantMatrix(sizeInput);
-  // // printMatrix(matrixA, sizeInput);
+  double bNorm;
+  countVectorLength(sizeInput, b, &bNorm);
+  double yNorm;
+  double numeratorTau;
+  double denominatorTau;
 
-  // double *b = new double[sizeInput];
-  // fillVectorB(b, matrixA, sizeInput);
-  // // std::cout << "vector b is" << std::endl;
-  // // printVector(b, sizeInput);
+#pragma omp parallel num_threads(1)
 
-  // std::fill(xCurr, xCurr + sizeInput, 0);
-  // // std::cout << "vector X at start is: " << std::endl;
-  // // printVector(xCurr, sizeInput);
-  ///* for testing when vector b uses sin ========= */
-
-  double bNorm = countVectorLength(sizeInput, b);
-
-  omp_set_num_threads(amontOfThreads);
-
-#pragma omp parallel
   {
-
     while (1) {
       multimplyMatrixOnVector(matrixA, xCurr, Atmp,
-                              sizeInput);      // A * x_n
-      substructVectors(Atmp, b, y, sizeInput); // y_n = A * x_n - b
-      double yNorm =
-          countVectorLength(sizeInput, y); // || A * x_n - b ||
-#pragma omp barrier
+                              sizeInput); // A * x_n
 
-      std::fill(Atmp, Atmp + sizeInput, 0);
+      substructVectors(Atmp, b, y, sizeInput); // y_n = A * x_n - b
+
+      countVectorLength(sizeInput, y,
+                        &yNorm); // || A * x_n - b ||
+
       multimplyMatrixOnVector(matrixA, y, Atmp, sizeInput); // A * y_n
-      double numeratorTau =
-          countScalarMult(y, Atmp, sizeInput); // (y_n, A * y_n)
-      double denominatorTau = countScalarMult(
-          Atmp, Atmp, sizeInput); // (A * y_n, A * y_n)
+
+      countScalarMult(y, Atmp, sizeInput,
+                      &numeratorTau); // (y_n, A * y_n)
+      countScalarMult(Atmp, Atmp, sizeInput,
+                      &denominatorTau); // (A * y_n, A * y_n)
 
       double tau = numeratorTau / denominatorTau;
-#pragma omp barrier
 
       countVectorMultNumber(y, tau, tauY, sizeInput); // tau * y
       substructVectors(xCurr, tauY, xNext,
@@ -226,74 +208,56 @@ int main(int argc, char *argv[]) {
 
       double critCurrentEnd = yNorm / bNorm;
 
-#pragma omp barrier 
+      if (iterationCounts > maxIterationCounts) {
+        std::cout << "Too many iterations. Change init values"
+                  << std::endl;
+        delete[] xCurr;
+        delete[] xNext;
+        delete[] Atmp;
+        delete[] y;
+        delete[] tauY;
+        delete[] matrixA;
+        delete[] b;
 
-
-      // if (iterationCounts > maxIterationCounts) {
-      //   std::cout << "Too many iterations. Change init values"
-      //             << std::endl;
-      //   delete[] xCurr;
-      //   delete[] xNext;
-      //   delete[] Atmp;
-      //   delete[] y;
-      //   delete[] tauY;
-      //   delete[] matrixA;
-      //   delete[] b;
-
-      //   // return 0;
-      //   abort();
-      // }
-
+        abort();
+      }
 
       if (critCurrentEnd < epsilon && critCurrentEnd < prevCritEnd &&
           critCurrentEnd < prevPrevCritEnd) {
-        #pragma omp master 
-        {
+
         isEndOfAlgo = true;
-        }
         break;
       }
+
+      copyVector(xNext, xCurr, sizeInput);
+
 #pragma omp barrier
 
-#pragma omp single
-{
-      copyVector(xNext, xCurr, sizeInput);
-}
+      prevPrevCritEnd = prevCritEnd;
+      prevCritEnd = critCurrentEnd;
 
 #pragma omp single
-      {
-        prevPrevCritEnd = prevCritEnd;
-        prevCritEnd = critCurrentEnd;
-      }
+      iterationCounts++;
+#pragma omp barrier
 
-// #pragma omp single
-//       { 
-
-  #pragma omp barrier 
-        iterationCounts++; 
       // std::cout << "iteration " << iterationCounts
       //           << " ended ===" << std::endl;
-      // }
     }
+  }
+  // clock_gettime(CLOCK_MONOTONIC_RAW, &endt);
+  double endt = omp_get_wtime();
 
-#pragma omp master
-    {
-      endt = omp_get_wtime();
+  if (isEndOfAlgo) {
+    std::cout << "Iteration amount in total: " << iterationCounts
+              << std::endl;
+    std::cout << "Time taken: " << endt - startt << " sec"
+              << std::endl;
 
-      if (isEndOfAlgo) {
+    // std::cout << "Solution (vector X is): " << std::endl;
+    // printVector(xNext, sizeInput);
 
-        std::cout << "Iteration amount in total: " << iterationCounts
-                  << std::endl;
-        std::cout << "Time taken: " << endt - startt << " sec"
-                  << std::endl;
-
-        // std::cout << "Solution (vector X is): " << std::endl;
-        // printVector(xNext, sizeInput);
-
-      } else {
-        std::cout << "There are no solutions =( Change input \n";
-      }
-    }
+  } else {
+    std::cout << "There are no solutions =( Change input \n";
   }
 
   delete[] xCurr;

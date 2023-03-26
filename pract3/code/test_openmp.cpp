@@ -3,10 +3,16 @@
 #include <iostream>
 #include <omp.h>
 
-
+/* for printinf type of scheduling*/
 #define xstr(x) str(x)
 #define str(x) #x
-#define TYPE auto
+// #define TYPE auto
+#define TYPE static
+// #define TYPE dynamic
+// #define TYPE guided
+// #define TYPE runtime
+
+#define CHUNK_SIZE 200
 
 void printMatrix(double *matrix, const size_t sizeInput) {
   for (size_t i = 0; i < sizeInput; ++i) {
@@ -50,11 +56,11 @@ double *fillRandomVector(const size_t sizeInput) {
 void multimplyMatrixOnVector(const double *matrix,
                              const double *vector, double *res,
                              const size_t sizeInput) {
-#pragma omp for schedule(TYPE)
+#pragma omp for schedule(TYPE, CHUNK_SIZE)
   for (int i = 0; i < sizeInput; i++) {
     res[i] = 0;
   }
-#pragma omp for collapse(2) schedule(TYPE)
+#pragma omp for collapse(2) schedule(TYPE, CHUNK_SIZE)
   for (size_t i = 0; i < sizeInput; ++i) {
     for (size_t j = 0; j < sizeInput; ++j) {
 #pragma omp atomic
@@ -70,7 +76,7 @@ void countScalarMult(const double *vector1, const double *vector2,
   { *res = 0; }
 #pragma omp barrier
 
-#pragma omp for reduction(+ : res[0]) schedule(TYPE)
+#pragma omp for reduction(+ : res[0]) schedule(TYPE, CHUNK_SIZE)
   for (size_t i = 0; i < sizeInput; ++i) {
     *res += vector1[i] * vector2[i];
   }
@@ -82,7 +88,7 @@ void countVectorLength(const size_t sizeInput, const double *vector,
   { *res = 0; }
 #pragma omp barrier
 
-#pragma omp for reduction(+ : res[0]) schedule(TYPE)
+#pragma omp for reduction(+ : res[0]) schedule(TYPE, CHUNK_SIZE)
   for (size_t i = 0; i < sizeInput; ++i) {
     *res += vector[i] * vector[i];
   }
@@ -101,7 +107,7 @@ void countVectorMultNumber(const double *vector, double scalar,
 
 void substructVectors(const double *vector1, const double *vector2,
                       double *res, const size_t sizeInput) {
-#pragma omp for schedule(TYPE)
+#pragma omp for schedule(TYPE, CHUNK_SIZE)
   for (size_t j = 0; j < sizeInput; ++j) {
     res[j] = vector1[j] - vector2[j];
   }
@@ -109,7 +115,7 @@ void substructVectors(const double *vector1, const double *vector2,
 
 void copyVector(const double *src, double *dst,
                 const size_t sizeInput) {
-#pragma omp for schedule(TYPE)
+#pragma omp for schedule(TYPE, CHUNK_SIZE)
   for (size_t i = 0; i < sizeInput; i++) {
     dst[i] = src[i];
   }
@@ -234,6 +240,8 @@ int main(int argc, char *argv[]) {
               << std::endl;
 
     std::cout << "Type of scheduling is: " << xstr(TYPE) << std::endl;
+    std::cout << "Chunk size is: " << xstr(CHUNK_SIZE) << std::endl;
+
   } else {
     std::cout << "There are no solutions =( Change input \n";
   }

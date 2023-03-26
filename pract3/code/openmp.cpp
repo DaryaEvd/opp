@@ -81,7 +81,7 @@ void multimplyMatrixOnVector(const double *matrix,
   }
 }
 
-/*============ only for test starts ============*/
+/*============ only for test, starts ============*/
 /* for testing when vector b uses sin*/
 double *fillVectorU(const size_t sizeInput) {
   double *vector = new double[sizeInput];
@@ -100,7 +100,7 @@ void fillVectorB(double *b, const double *fullMatrixA,
 
   delete[] vectorU;
 }
-/*============ only for test ended ============*/
+/*============ only for test, ended ============*/
 
 void countScalarMult(const double *vector1, const double *vector2,
                      const size_t sizeInput, double *res) {
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
   double *xCurr = new double[sizeInput];
   double *xNext = new double[sizeInput];
 
-  ///* for testing data with RANDOM values starts ========= */
+  ///* for testing data with RANDOM values, starts ========= */
   double *matrixA = fillRandomMatrix(sizeInput);
   // printMatrix(matrixA, sizeInput);
   double *b = fillRandomVector(sizeInput);
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
   std::fill(xCurr, xCurr + sizeInput, 0);
   // std::cout << "vector X at start is: " << std::endl;
   // printVector(xCurr, sizeInput);
-  ///* for testing data with RANDOM values ended ========= */
+  ///* for testing data with RANDOM values, ended ========= */
 
   ///* for testing when vector b uses sin starts ========= */
   // double *matrixA = fillConstantMatrix(sizeInput);

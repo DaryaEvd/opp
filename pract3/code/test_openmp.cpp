@@ -6,6 +6,7 @@
 /* for printinf type of scheduling*/
 #define xstr(x) str(x)
 #define str(x) #x
+
 // #define TYPE auto
 #define TYPE static
 // #define TYPE dynamic

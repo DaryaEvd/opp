@@ -7,3 +7,5 @@ Parallel Programming course at NSU
 Отчёт: [тык](https://github.com/DaryaEvd/opp/blob/main/pract1/%D0%9F%D1%80%D0%B0%D0%BA%D1%821_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf).
 - [pract2](https://github.com/DaryaEvd/opp/tree/main/pract2) - Решение СЛАУ методом минимальных невязок при помощи MPI
 Отчет: [тык](https://github.com/DaryaEvd/opp/blob/main/pract2/%D0%9F%D1%80%D0%B0%D0%BA%D1%822_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf)
+- [pract3](https://github.com/DaryaEvd/opp/tree/main/pract3) - Решение СЛАУ методом минимальных невязок при помощи OpenMP
+Отчет: [тык](https://github.com/DaryaEvd/opp/blob/main/pract3/%D0%9F%D1%80%D0%B0%D0%BA%D1%823_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf)

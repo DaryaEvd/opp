@@ -21,14 +21,6 @@ void initMatrix(MyMatrix matrix) {
   }
 }
 
-void zerofyMatrix(MyMatrix matrix) {
-  for (size_t i = 0; i < matrix.rows; ++i) {
-    for (size_t j = 0; j < matrix.colmns; ++j) {
-      matrix.data[i * matrix.colmns + j] = 0;
-    }
-  }
-}
-
 void freeMatrix(MyMatrix matrix) { delete[] matrix.data; }
 
 void printMatrix(MyMatrix matrix) {
@@ -98,7 +90,6 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  zerofyMatrix(mRes);
   multimplyMtrices(m1, m2, mRes);
   std::cout << "Matrix mRes : " << std::endl;
   printMatrix(mRes);

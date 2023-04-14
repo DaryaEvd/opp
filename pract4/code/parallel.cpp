@@ -81,7 +81,6 @@ int main(int argc, char **argv) {
   int periods[dimOfAnyGrid] = {0};
 
   MPI_Comm commGrid;
-
   MPI_Cart_create(MPI_COMM_WORLD, dimOfAnyGrid, dimSize, periods, 0,
                   &commGrid);
 
@@ -114,7 +113,6 @@ int main(int argc, char **argv) {
   }
 
   MyMatrix partA(dim1 / dimSize[X_AXIS], dim2);
-  MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
 
   double startt = MPI_Wtime();
 
@@ -132,25 +130,28 @@ int main(int argc, char **argv) {
   MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bColumnType);
   MPI_Type_commit(&bColumnType);
 
-  if (rankOfCurrProc == 0) {
-    for (int i = 0; i < dim2; i++) {
-      for (int j = 0; j < partB.column; j++) {
-        partB.data[i * partB.column + j] = B.data[i * dim3 + j];
+  if (coordsOfCurrProc[X_AXIS] == 0) {
+    if (rankOfCurrProc == 0) {
+      for (int i = 0; i < dim2; i++) {
+        for (int j = 0; j < partB.column; j++) {
+          partB.data[i * partB.column + j] = B.data[i * dim3 + j];
+        }
       }
-    }
 
-    for (int i = 1; i < dimSize[Y_AXIS]; i++) {
-      MPI_Send(B.data + partB.column * i, 1, bColumnType, i, 1,
-               commRow);
+      for (int i = 1; i < dimSize[Y_AXIS]; i++) {
+        MPI_Send(B.data + partB.column * i, 1, bColumnType, i, 1,
+                 commRow);
+      }
+    } else {
+      MPI_Recv(partB.data, dim3 * columnsGrid, MPI_DOUBLE, 0, 1,
+               commRow, MPI_STATUS_IGNORE);
     }
-  } else {
-    MPI_Recv(partB.data, dim2 * partB.column, MPI_DOUBLE, 0, 1,
-             commRow, MPI_STATUS_IGNORE);
   }
 
   MPI_Bcast(partB.data, dim2 * partB.column, MPI_DOUBLE, 0,
             commColumn);
 
+  MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
   multimplyMtrices(partA, partB, partC);
 
   // if (rankOfCurrProc == 0) {
@@ -184,8 +185,8 @@ int main(int argc, char **argv) {
       }
     }
     for (int i = 1; i < amountOfProcs; i++) {
-      MPI_Recv(C.data + offset[i], 1, cRecvType, i, 1,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(C.data + offset[i], 1, cRecvType, i, 1, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
     }
   }
 

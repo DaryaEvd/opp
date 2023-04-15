@@ -55,7 +55,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  srand(time(nullptr));
+  // srand(time(nullptr)); // just for random vales each time
+  srand(0); // for testint the same values in one task
 
   const size_t dim1 = atoi(argv[1]);
   const size_t dim2 = atoi(argv[2]);
@@ -146,9 +147,9 @@ int main(int argc, char **argv) {
                commRow);
     }
 
-    for (int i = 0; i < dim2; i++) {
+    for (int i = 0; i < B.row; i++) {
       for (int j = 0; j < partB.column; j++) {
-        partB.data[i * partB.column + j] = B.data[i * dim3 + j];
+        partB.data[i * partB.column + j] = B.data[i * B.column + j];
       }
     }
   }
@@ -173,7 +174,7 @@ int main(int argc, char **argv) {
   for (int procRank = 0; procRank < amountOfProcs; procRank++) {
     MPI_Cart_coords(commGrid, procRank, dimOfAnyGrid,
                     coordsOfCurrProc);
-
+    
     offset[procRank] =
         coordsOfCurrProc[Y_AXIS] * partC.column +
         coordsOfCurrProc[X_AXIS] * partC.row * C.column;
@@ -223,3 +224,4 @@ int main(int argc, char **argv) {
   MPI_Finalize();
   return 0;
 }
+

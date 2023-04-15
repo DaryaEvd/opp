@@ -46,6 +46,7 @@ void printMat(MyMatrix matrix) {
     std::cout << std::endl;
   }
 }
+
 int main(int argc, char **argv) {
   if (argc != 6) {
     std::cout
@@ -53,6 +54,8 @@ int main(int argc, char **argv) {
         << std::endl;
     return 0;
   }
+
+  srand(time(nullptr));
 
   const size_t dim1 = atoi(argv[1]);
   const size_t dim2 = atoi(argv[2]);
@@ -81,6 +84,9 @@ int main(int argc, char **argv) {
   int periods[] = {0};
 
   MPI_Comm commGrid;
+
+  double startt = MPI_Wtime();
+
   MPI_Cart_create(MPI_COMM_WORLD, dimOfAnyGrid, dimSize, periods, 0,
                   &commGrid);
 
@@ -114,8 +120,6 @@ int main(int argc, char **argv) {
 
   MyMatrix partA(dim1 / dimSize[X_AXIS], dim2);
 
-  double startt = MPI_Wtime();
-
   if (coordsOfCurrProc[Y_AXIS] == 0) {
     MPI_Scatter(A.data, partA.row * partA.column, MPI_DOUBLE,
                 partA.data, partA.row * partA.column, MPI_DOUBLE, 0,
@@ -126,24 +130,20 @@ int main(int argc, char **argv) {
 
   MyMatrix partB(dim2, dim3 / dimSize[Y_AXIS]);
 
-  MPI_Datatype bColumnType;
-  MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bColumnType);
-  MPI_Type_commit(&bColumnType);
+  MPI_Datatype bSendType; // type of columns
+  MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bSendType);
+  MPI_Type_commit(&bSendType);
 
-  // if (coordsOfCurrProc[X_AXIS] == 0 &&
-  //     coordsOfCurrProc[Y_AXIS] == 0) {
-
-  MPI_Datatype bRecvType;
-  MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE, &bRecvType);
+  MPI_Datatype bRecvType; // type of only ONE (!!!) column
+  MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE,
+                  &bRecvType);
   MPI_Type_commit(&bRecvType);
-
-  if (rankOfCurrProc == 0) {
+ 
+  if (coordsOfCurrProc[X_AXIS] == 0 &&
+      coordsOfCurrProc[Y_AXIS] == 0) {
     for (int i = 1; i < columnsGrid; i++) {
-      MPI_Send(B.data + partB.column * i, 1, bColumnType, i, 11,
+      MPI_Send(B.data + partB.column * i, 1, bSendType, i, 11,
                commRow);
-      // MPI_Send(const void *buf, MPI_Count count,
-      //          MPI_Datatype datatype, int dest, int tag,
-      //          MPI_Comm comm);
     }
 
     for (int i = 0; i < dim2; i++) {
@@ -154,19 +154,9 @@ int main(int argc, char **argv) {
   }
 
   else if (coordsOfCurrProc[X_AXIS] == 0) {
-
     MPI_Recv(partB.data, 1, bRecvType, 0, 11, commRow,
              MPI_STATUS_IGNORE);
-
-    // MPI_Recv(partB.data, dim3 * columnsGrid, MPI_DOUBLE, 0, 11,
-    //          commRow, MPI_STATUS_IGNORE);
-
-    // MPI_Recv(void *buf, MPI_Count count, MPI_Datatype datatype,
-    //          int source, int tag, MPI_Comm comm,
-    //          MPI_Status *status);
   }
-
-  // }
 
   MPI_Bcast(partB.data, dim2 * partB.column, MPI_DOUBLE, 0,
             commColumn);
@@ -192,22 +182,19 @@ int main(int argc, char **argv) {
   if (rankOfCurrProc == 0) {
     for (int i = 0; i < partC.row; i++) {
       for (int j = 0; j < partC.column; j++) {
-        C.data[i * C.column + j] = partC.data[i * partC.column +
-        j];
+        C.data[i * C.column + j] = partC.data[i * partC.column + j];
       }
     }
     for (int i = 1; i < amountOfProcs; i++) {
-      MPI_Recv(C.data + offset[i], 1, cRecvType, i, 0,
-      MPI_COMM_WORLD,
+      MPI_Recv(C.data + offset[i], 1, cRecvType, i, 0, MPI_COMM_WORLD,
                MPI_STATUS_IGNORE);
     }
-  } else   {
-    MPI_Send(partC.data, partC.row * partC.column, MPI_DOUBLE, 0,
-    0,
+  } else {
+    MPI_Send(partC.data, partC.row * partC.column, MPI_DOUBLE, 0, 0,
              MPI_COMM_WORLD);
   }
 
-  MPI_Type_free(&bColumnType);
+  MPI_Type_free(&bSendType);
   MPI_Type_free(&cRecvType);
 
   MPI_Comm_free(&commGrid);

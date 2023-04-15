@@ -77,8 +77,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  int dimSize[dimOfAnyGrid] = {rowsGrid, columnsGrid};
-  int periods[dimOfAnyGrid] = {0};
+  int dimSize[] = {rowsGrid, columnsGrid};
+  int periods[] = {0};
 
   MPI_Comm commGrid;
   MPI_Cart_create(MPI_COMM_WORLD, dimOfAnyGrid, dimSize, periods, 0,
@@ -89,11 +89,11 @@ int main(int argc, char **argv) {
                   coordsOfCurrProc);
 
   MPI_Comm commRow;
-  int remainX[dimOfAnyGrid] = {X_AXIS, Y_AXIS};
+  int remainX[] = {X_AXIS, Y_AXIS};
   MPI_Cart_sub(commGrid, remainX, &commRow);
 
   MPI_Comm commColumn;
-  int remainY[dimOfAnyGrid] = {Y_AXIS, X_AXIS};
+  int remainY[] = {Y_AXIS, X_AXIS};
   MPI_Cart_sub(commGrid, remainY, &commColumn);
 
   MyMatrix A(dim1, dim2);
@@ -104,12 +104,12 @@ int main(int argc, char **argv) {
     initMatrix(A);
     initMatrix(B);
 
-    std::cout << "A[" << A.row << " x " << A.column << "]"
-              << std::endl;
-    printMat(A);
-    std::cout << "B[" << B.row << " x " << B.column << "]"
-              << std::endl;
-    printMat(B);
+    // std::cout << "A[" << A.row << " x " << A.column << "]"
+    //           << std::endl;
+    // printMat(A);
+    // std::cout << "B[" << B.row << " x " << B.column << "]"
+    //           << std::endl;
+    // printMat(B);
   }
 
   MyMatrix partA(dim1 / dimSize[X_AXIS], dim2);
@@ -130,88 +130,108 @@ int main(int argc, char **argv) {
   MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bColumnType);
   MPI_Type_commit(&bColumnType);
 
-  if (coordsOfCurrProc[X_AXIS] == 0) {
-    if (rankOfCurrProc == 0) {
-      for (int i = 0; i < dim2; i++) {
-        for (int j = 0; j < partB.column; j++) {
-          partB.data[i * partB.column + j] = B.data[i * dim3 + j];
-        }
-      }
+  // if (coordsOfCurrProc[X_AXIS] == 0 &&
+  //     coordsOfCurrProc[Y_AXIS] == 0) {
 
-      for (int i = 1; i < dimSize[Y_AXIS]; i++) {
-        MPI_Send(B.data + partB.column * i, 1, bColumnType, i, 1,
-                 commRow);
+  MPI_Datatype bRecvType;
+  MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE, &bRecvType);
+  MPI_Type_commit(&bRecvType);
+
+  if (rankOfCurrProc == 0) {
+    for (int i = 1; i < columnsGrid; i++) {
+      MPI_Send(B.data + partB.column * i, 1, bColumnType, i, 11,
+               commRow);
+      // MPI_Send(const void *buf, MPI_Count count,
+      //          MPI_Datatype datatype, int dest, int tag,
+      //          MPI_Comm comm);
+    }
+
+    for (int i = 0; i < dim2; i++) {
+      for (int j = 0; j < partB.column; j++) {
+        partB.data[i * partB.column + j] = B.data[i * dim3 + j];
       }
-    } else {
-      MPI_Recv(partB.data, dim3 * columnsGrid, MPI_DOUBLE, 0, 1,
-               commRow, MPI_STATUS_IGNORE);
     }
   }
+
+  else if (coordsOfCurrProc[X_AXIS] == 0) {
+
+    MPI_Recv(partB.data, 1, bRecvType, 0, 11, commRow,
+             MPI_STATUS_IGNORE);
+
+    // MPI_Recv(partB.data, dim3 * columnsGrid, MPI_DOUBLE, 0, 11,
+    //          commRow, MPI_STATUS_IGNORE);
+
+    // MPI_Recv(void *buf, MPI_Count count, MPI_Datatype datatype,
+    //          int source, int tag, MPI_Comm comm,
+    //          MPI_Status *status);
+  }
+
+  // }
 
   MPI_Bcast(partB.data, dim2 * partB.column, MPI_DOUBLE, 0,
             commColumn);
 
-  MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
-  multimplyMtrices(partA, partB, partC);
+  // MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
+  // multimplyMtrices(partA, partB, partC);
 
-  // if (rankOfCurrProc == 0) {
-  //   std::cout << "Part of C" << std::endl;
-  //   printMat(partC);
+  // MPI_Datatype cRecvType;
+  // MPI_Type_vector(partC.row, partC.column, dim3, MPI_DOUBLE,
+  //                 &cRecvType);
+  // MPI_Type_commit(&cRecvType);
+
+  // int offset[amountOfProcs];
+  // for (int procRank = 0; procRank < amountOfProcs; procRank++) {
+  //   MPI_Cart_coords(commGrid, procRank, dimOfAnyGrid,
+  //                   coordsOfCurrProc);
+
+  //   offset[procRank] =
+  //       coordsOfCurrProc[Y_AXIS] * partC.column +
+  //       coordsOfCurrProc[X_AXIS] * partC.row * C.column;
   // }
 
-  MPI_Datatype cRecvType;
-  MPI_Type_vector(partC.row, partC.column, dim3, MPI_DOUBLE,
-                  &cRecvType);
-  MPI_Type_commit(&cRecvType);
+  // if (rankOfCurrProc == 0) {
+  //   for (int i = 0; i < partC.row; i++) {
+  //     for (int j = 0; j < partC.column; j++) {
+  //       C.data[i * C.column + j] = partC.data[i * partC.column +
+  //       j];
+  //     }
+  //   }
+  //   for (int i = 1; i < amountOfProcs; i++) {
+  //     MPI_Recv(C.data + offset[i], 1, cRecvType, i, 0,
+  //     MPI_COMM_WORLD,
+  //              MPI_STATUS_IGNORE);
+  //   }
+  // } else   {
+  //   MPI_Send(partC.data, partC.row * partC.column, MPI_DOUBLE, 0,
+  //   0,
+  //            MPI_COMM_WORLD);
+  // }
 
-  int offset[amountOfProcs];
-  for (int procRank = 0; procRank < amountOfProcs; procRank++) {
-    MPI_Cart_coords(commGrid, procRank, dimOfAnyGrid,
-                    coordsOfCurrProc);
+  // MPI_Type_free(&bColumnType);
+  // MPI_Type_free(&cRecvType);
 
-    offset[procRank] =
-        coordsOfCurrProc[Y_AXIS] * partC.column +
-        coordsOfCurrProc[X_AXIS] * partC.row * C.column;
-  }
+  // MPI_Comm_free(&commGrid);
+  // MPI_Comm_free(&commColumn);
+  // MPI_Comm_free(&commRow);
 
-  if (rankOfCurrProc != 0) {
-    MPI_Send(partC.data, partC.row * partC.column, MPI_DOUBLE, 0, 1,
-             MPI_COMM_WORLD);
+  // double endt = MPI_Wtime();
 
-  } else {
-    for (int i = 0; i < partC.row; i++) {
-      for (int j = 0; j < partC.column; j++) {
-        C.data[i * C.column + j] = partC.data[i * partC.column + j];
-      }
-    }
-    for (int i = 1; i < amountOfProcs; i++) {
-      MPI_Recv(C.data + offset[i], 1, cRecvType, i, 1, MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
-    }
-  }
+  // if (rankOfCurrProc == 0) {
+  //   // std::cout << "C[" << C.row << " x " << C.column << "]"
+  //   //           << std::endl;
+  //   // printMat(C);
 
-  MPI_Type_free(&bColumnType);
-  MPI_Type_free(&cRecvType);
+  //   std::cout << "Time taken: " << endt - startt << " sec"
+  //             << std::endl;
+  // }
 
-  MPI_Comm_free(&commGrid);
-  MPI_Comm_free(&commColumn);
-  MPI_Comm_free(&commRow);
+  // freeMatrix(A);
+  // freeMatrix(B);
+  // freeMatrix(C);
 
-  double endt = MPI_Wtime();
-
-  if (rankOfCurrProc == 0) {
-    std::cout << "C[" << C.row << " x " << C.column << "]"
-              << std::endl;
-    printMat(C);
-  }
-
-  freeMatrix(A);
-  freeMatrix(B);
-  freeMatrix(C);
-
-  freeMatrix(partA);
-  freeMatrix(partB);
-  freeMatrix(partC);
+  // freeMatrix(partA);
+  // freeMatrix(partB);
+  // freeMatrix(partC);
 
   MPI_Finalize();
   return 0;

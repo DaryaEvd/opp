@@ -1,6 +1,13 @@
 #include <iostream>
 #include <mpi.h>
 
+/* Axises are
+|-----Y
+|
+|
+X
+*/
+
 static int dimOfAnyGrid = 2;
 static int X_AXIS = 0;
 static int Y_AXIS = 1;

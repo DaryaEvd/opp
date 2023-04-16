@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
   MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE,
                   &bRecvType);
   MPI_Type_commit(&bRecvType);
- 
+
   if (coordsOfCurrProc[X_AXIS] == 0 &&
       coordsOfCurrProc[Y_AXIS] == 0) {
     for (int i = 1; i < columnsGrid; i++) {
@@ -181,10 +181,12 @@ int main(int argc, char **argv) {
   for (int procRank = 0; procRank < amountOfProcs; procRank++) {
     MPI_Cart_coords(commGrid, procRank, dimOfAnyGrid,
                     coordsOfCurrProc);
-    
+
+    // define the location of sqaure (partC) relatively from the start
+    // of full matrix C
     offset[procRank] =
-        coordsOfCurrProc[Y_AXIS] * partC.column +
-        coordsOfCurrProc[X_AXIS] * partC.row * C.column;
+        coordsOfCurrProc[X_AXIS] * partC.row * C.column +
+        coordsOfCurrProc[Y_AXIS] * partC.column;
   }
 
   if (rankOfCurrProc == 0) {
@@ -231,4 +233,3 @@ int main(int argc, char **argv) {
   MPI_Finalize();
   return 0;
 }
-

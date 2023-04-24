@@ -62,8 +62,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  // srand(time(nullptr)); // just for random vales each time
-  srand(0); // for testint the same values in one task
+  srand(time(nullptr)); // just for random vales each time
+  // srand(0); // for testint the same values in one task
 
   const size_t dim1 = atoi(argv[1]);
   const size_t dim2 = atoi(argv[2]);
@@ -139,16 +139,11 @@ int main(int argc, char **argv) {
   MyMatrix partB(dim2, dim3 / dimSize[Y_AXIS]);
 
   MPI_Datatype bSendType; // type of columns
- 
+
   // number of blocks, numbers of elems in each block, number of
   // elems between the start of each block, old type, new type
   MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bSendType);
   MPI_Type_commit(&bSendType);
-
-  MPI_Datatype bRecvType; // type of only ONE (!!!) column
-  MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE,
-                  &bRecvType);
-  MPI_Type_commit(&bRecvType);
 
   if (coordsOfCurrProc[X_AXIS] == 0 &&
       coordsOfCurrProc[Y_AXIS] == 0) {
@@ -165,13 +160,12 @@ int main(int argc, char **argv) {
   }
 
   else if (coordsOfCurrProc[X_AXIS] == 0) {
-    MPI_Recv(partB.data, 1, bRecvType, 0, 11, commRow,
-             MPI_STATUS_IGNORE);
+    MPI_Recv(partB.data, partB.row * partB.column, MPI_DOUBLE, 0, 11,
+             commRow, MPI_STATUS_IGNORE);
   }
 
   MPI_Bcast(partB.data, dim2 * partB.column, MPI_DOUBLE, 0,
             commColumn);
-
   MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
   multiplyMtrices(partA, partB, partC);
 
@@ -185,8 +179,8 @@ int main(int argc, char **argv) {
     MPI_Cart_coords(commGrid, procRank, dimOfAnyGrid,
                     coordsOfCurrProc);
 
-    // define the location of sqaure (partC) relatively from the start
-    // of full matrix C
+    // define the location of sqaure (partC)
+    // relatively from the start of full matrix C
     offset[procRank] =
         coordsOfCurrProc[X_AXIS] * partC.row * C.column +
         coordsOfCurrProc[Y_AXIS] * partC.column;
@@ -217,7 +211,8 @@ int main(int argc, char **argv) {
   double endt = MPI_Wtime();
 
   if (rankOfCurrProc == 0) {
-    // std::cout << "C[" << C.row << " x " << C.column << "]"
+    // std::cout << "C[" << C.row << " x " << C.column
+    // << "]"
     //           << std::endl;
     // printMat(C);
 

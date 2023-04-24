@@ -235,15 +235,6 @@ int main(int argc, char **argv) {
   MPI_Type_commit(&bSendType);
 
   /*
-    Создаем новый тип, который определяет только один (!!!) столбец
-    матрицы B
-  */
-  MPI_Datatype bRecvType; // type of only ONE (!!!) column
-  MPI_Type_vector(1, partB.row * partB.column, 0, MPI_DOUBLE,
-                  &bRecvType);
-  MPI_Type_commit(&bRecvType);
-
-  /*
     Выделяем данные в матрице В для дальнейшей раздачи
 
     ** Раздачу производит нулевой процесс
@@ -275,8 +266,8 @@ int main(int argc, char **argv) {
     происходит прием данных на нулевой столбец решётки
   */
   else if (coordsOfCurrProc[X_AXIS] == 0) {
-    MPI_Recv(partB.data, 1, bRecvType, 0, 11, commRow,
-             MPI_STATUS_IGNORE);
+    MPI_Recv(partB.data, partB.row * partB.column, MPI_DOUBLE, 0, 11,
+             commRow, MPI_STATUS_IGNORE);
   }
 
   /*

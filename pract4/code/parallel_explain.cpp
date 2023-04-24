@@ -34,7 +34,7 @@ void initMatrix(MyMatrix matrix) {
   }
 }
 
-void multimplyMtrices(MyMatrix m1, MyMatrix m2, MyMatrix mRes) {
+void multiplyMtrices(MyMatrix m1, MyMatrix m2, MyMatrix mRes) {
   for (size_t i = 0; i < m1.row; i++) {
     for (size_t j = 0; j < m2.column; j++) {
       for (size_t k = 0; k < m1.column; k++) {
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
   /*
     Перемножаем строку матрицы А на столбец матрицы В
   */
-  multimplyMtrices(partA, partB, partC);
+  multiplyMtrices(partA, partB, partC);
 
   MPI_Datatype cRecvType;
   MPI_Type_vector(partC.row, partC.column, dim3, MPI_DOUBLE,

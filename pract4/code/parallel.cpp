@@ -34,7 +34,7 @@ void initMatrix(MyMatrix matrix) {
   }
 }
 
-void multimplyMtrices(MyMatrix m1, MyMatrix m2, MyMatrix mRes) {
+void multiplyMtrices(MyMatrix m1, MyMatrix m2, MyMatrix mRes) {
   for (size_t i = 0; i < m1.row; i++) {
     for (size_t j = 0; j < m2.column; j++) {
       for (size_t k = 0; k < m1.column; k++) {
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
   double startt = MPI_Wtime();
 
   MPI_Cart_create(MPI_COMM_WORLD, dimOfAnyGrid, dimSize, periods, 0,
-                  &commGrid);
+                  &commGrid); // reorder = 0
 
   int coordsOfCurrProc[dimOfAnyGrid];
   MPI_Cart_coords(commGrid, rankOfCurrProc, dimOfAnyGrid,
@@ -139,6 +139,9 @@ int main(int argc, char **argv) {
   MyMatrix partB(dim2, dim3 / dimSize[Y_AXIS]);
 
   MPI_Datatype bSendType; // type of columns
+ 
+  // number of blocks, numbers of elems in each block, number of
+  // elems between the start of each block, old type, new type
   MPI_Type_vector(dim2, partB.column, dim3, MPI_DOUBLE, &bSendType);
   MPI_Type_commit(&bSendType);
 
@@ -170,7 +173,7 @@ int main(int argc, char **argv) {
             commColumn);
 
   MyMatrix partC(dim1 / dimSize[X_AXIS], dim3 / dimSize[Y_AXIS]);
-  multimplyMtrices(partA, partB, partC);
+  multiplyMtrices(partA, partB, partC);
 
   MPI_Datatype cRecvType;
   MPI_Type_vector(partC.row, partC.column, dim3, MPI_DOUBLE,

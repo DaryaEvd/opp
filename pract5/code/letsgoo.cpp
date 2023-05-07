@@ -7,7 +7,7 @@ struct MyMatrix {
   size_t rows;
 
   MyMatrix(size_t rows, size_t colmns) {
-    data = new int[colmns * rows];
+    data = new int[colmns * rows]();
     this->rows = rows;
     this->colmns = colmns;
   }
@@ -40,20 +40,6 @@ void printMatrixToFile(MyMatrix matrix, std::fstream &file) {
   }
 }
 
-// void readMatrixFromFile(MyMatrix matrix, std::fstream &file) {
-//   // for (size_t i = 0; i < matrix.rows; ++i) {
-//   //   for (size_t j = 0; j < matrix.colmns; ++j) {
-//   //     file << matrix.data[i * matrix.colmns + j] << " ";
-//   //   }
-//   //   file << "\n";
-//   // }
-//   std::string str;
-//   while(std::getline(file, str)) {
-
-//   }
-
-// }
-
 void copyMatrix(MyMatrix oldMatr, MyMatrix newMatr) {
   for (size_t i = 0; i < oldMatr.rows; ++i) {
     for (size_t j = 0; j < oldMatr.colmns; ++j) {
@@ -69,13 +55,6 @@ int countNeighbors(MyMatrix matrix, int xMatr, int yMatr) {
 
   for (int i = -1; i < 2; ++i) { // rows
     for (int j = -1; j < 2; ++j) { // columns
-      
-      // std::cout << "You're at: " << 
-      //     matrix.data[x * matrix.colmns + y] << std::endl;
-
-      // int column = (y + j + matrix.colmns) % matrix.colmns;
-      // int row = (x + i + matrix.rows) % matrix.rows;
-      // sum += matrix.data[row * matrix.colmns + column];
 
       int currRow = (xMatr + i + matrix.rows) % matrix.rows; 
       int currColumn = (yMatr + j + matrix.colmns) % matrix.colmns;

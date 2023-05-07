@@ -40,6 +40,20 @@ void printMatrixToFile(MyMatrix matrix, std::fstream &file) {
   }
 }
 
+// void readMatrixFromFile(MyMatrix matrix, std::fstream &file) {
+//   // for (size_t i = 0; i < matrix.rows; ++i) {
+//   //   for (size_t j = 0; j < matrix.colmns; ++j) {
+//   //     file << matrix.data[i * matrix.colmns + j] << " ";
+//   //   }
+//   //   file << "\n";
+//   // }
+//   std::string str;
+//   while(std::getline(file, str)) {
+
+//   }
+
+// }
+
 void copyMatrix(MyMatrix oldMatr, MyMatrix newMatr) {
   for (size_t i = 0; i < oldMatr.rows; ++i) {
     for (size_t j = 0; j < oldMatr.colmns; ++j) {
@@ -49,29 +63,42 @@ void copyMatrix(MyMatrix oldMatr, MyMatrix newMatr) {
   }
 }
 
-int countNeighbors(MyMatrix matrix, int x, int y) {
+// x - rows, y - columns
+int countNeighbors(MyMatrix matrix, int xMatr, int yMatr) {
   int sum = 0;
 
-  for (size_t i = -1; i < 2; ++i) {
-    for (size_t j = -1; j < 2; ++j) {
-  
-      int column = (x + j + matrix.colmns) % matrix.colmns;
-      int row = (y + i + matrix.rows) % matrix.rows;
+  for (int i = -1; i < 2; ++i) { // rows
+    for (int j = -1; j < 2; ++j) { // columns
+      
+      // std::cout << "You're at: " << 
+      //     matrix.data[x * matrix.colmns + y] << std::endl;
 
-      sum += matrix.data[row * matrix.colmns + column];
+      // int column = (y + j + matrix.colmns) % matrix.colmns;
+      // int row = (x + i + matrix.rows) % matrix.rows;
+      // sum += matrix.data[row * matrix.colmns + column];
+
+      int currRow = (xMatr + i + matrix.rows) % matrix.rows; 
+      int currColumn = (yMatr + j + matrix.colmns) % matrix.colmns;
+
+      sum += matrix.data[currRow * matrix.colmns + currColumn];
+
     }
   }
 
-  sum -= matrix.data[x * matrix.colmns + y];
+  sum -= matrix.data[xMatr * matrix.colmns + yMatr];
+  std::cout << "SUMMA is: " << sum << std::endl << std::endl;
 
   return sum;
 }
 
 void computeNextGeneration(MyMatrix matrix, MyMatrix nextMatrix) {
-  for (size_t i = 0; i < matrix.rows; ++i) {
-    for (size_t j = 0; j < matrix.colmns; ++j) {
+  int clown = 0;
+  for (int i = 0; i < matrix.rows; ++i) {
+    for (int j = 0; j < matrix.colmns; ++j) {
       
       int state = matrix.data[i * matrix.colmns + j];
+
+      std::cout << "CLOWN: " << clown << ": " << state << std::endl;
 
       int neighborsAmount = countNeighbors(matrix, i, j);
 
@@ -83,10 +110,10 @@ void computeNextGeneration(MyMatrix matrix, MyMatrix nextMatrix) {
       }
       else {
         nextMatrix.data[i * nextMatrix.colmns + j] =
-            matrix.data[i * nextMatrix.colmns + j] = 0;
+            matrix.data[i * nextMatrix.colmns + j] = state;
       }
 
-
+      clown++;
     }
   }
 }
@@ -125,19 +152,23 @@ int main(int argc, char **argv) {
   }
   printMatrixToFile(matrixStart, inputFile);
 
-  MyMatrix matrixCopy = MyMatrix(rowsAmount, columnsAmount);
-  copyMatrix(matrixStart, matrixCopy);
+  MyMatrix nextGen = MyMatrix(rowsAmount, columnsAmount);
 
-  std::fstream interFile;
-  interFile.open("inter.txt");
-  if (!interFile) {
-    std::cout << "Can't open inter file\n";
+  std::fstream outputFile;
+  outputFile.open("end.txt");
+  if (!outputFile) {
+    std::cout << "Can't open output file\n";
+    freeMatrix(matrixStart);
+    inputFile.close();
     return 0;
   }
 
-  computeNextGeneration(matrixStart);
+  computeNextGeneration(matrixStart, nextGen);
+
+  printMatrixToFile(nextGen, outputFile);
 
   inputFile.close();
+  outputFile.close();
 
   freeMatrix(matrixStart);
 

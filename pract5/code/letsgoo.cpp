@@ -53,14 +53,13 @@ void copyMatrix(MyMatrix oldMatr, MyMatrix newMatr) {
 int countNeighbors(MyMatrix matrix, int xMatr, int yMatr) {
   int sum = 0;
 
-  for (int i = -1; i < 2; ++i) { // rows
+  for (int i = -1; i < 2; ++i) {   // rows
     for (int j = -1; j < 2; ++j) { // columns
 
-      int currRow = (xMatr + i + matrix.rows) % matrix.rows; 
+      int currRow = (xMatr + i + matrix.rows) % matrix.rows;
       int currColumn = (yMatr + j + matrix.colmns) % matrix.colmns;
 
       sum += matrix.data[currRow * matrix.colmns + currColumn];
-
     }
   }
 
@@ -74,20 +73,19 @@ void computeNextGeneration(MyMatrix matrix, MyMatrix nextMatrix) {
   int clown = 0;
   for (int i = 0; i < matrix.rows; ++i) {
     for (int j = 0; j < matrix.colmns; ++j) {
-      
+
       int state = matrix.data[i * matrix.colmns + j];
 
       std::cout << "CLOWN: " << clown << ": " << state << std::endl;
 
       int neighborsAmount = countNeighbors(matrix, i, j);
 
-      if(state == 0 && neighborsAmount == 3) {
+      if (state == 0 && neighborsAmount == 3) {
         nextMatrix.data[i * nextMatrix.colmns + j] = 1;
-      }
-      else if(state == 1 && (neighborsAmount < 2 || neighborsAmount > 3)) {
+      } else if (state == 1 &&
+                 (neighborsAmount < 2 || neighborsAmount > 3)) {
         nextMatrix.data[i * nextMatrix.colmns + j] = 0;
-      }
-      else {
+      } else {
         nextMatrix.data[i * nextMatrix.colmns + j] =
             matrix.data[i * nextMatrix.colmns + j] = state;
       }
@@ -131,8 +129,6 @@ int main(int argc, char **argv) {
   }
   printMatrixToFile(matrixStart, inputFile);
 
-  MyMatrix nextGen = MyMatrix(rowsAmount, columnsAmount);
-
   std::fstream outputFile;
   outputFile.open("end.txt");
   if (!outputFile) {
@@ -142,6 +138,7 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  MyMatrix nextGen = MyMatrix(rowsAmount, columnsAmount);
   computeNextGeneration(matrixStart, nextGen);
 
   printMatrixToFile(nextGen, outputFile);

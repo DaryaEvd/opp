@@ -2,12 +2,12 @@
 #include <iostream>
 
 struct MyMatrix {
-  double *data = nullptr;
+  int *data = nullptr;
   size_t colmns;
   size_t rows;
 
   MyMatrix(size_t rows, size_t colmns) {
-    data = new double[colmns * rows];
+    data = new int[colmns * rows];
     this->rows = rows;
     this->colmns = colmns;
   }
@@ -40,6 +40,57 @@ void printMatrixToFile(MyMatrix matrix, std::fstream &file) {
   }
 }
 
+void copyMatrix(MyMatrix oldMatr, MyMatrix newMatr) {
+  for (size_t i = 0; i < oldMatr.rows; ++i) {
+    for (size_t j = 0; j < oldMatr.colmns; ++j) {
+      newMatr.data[i * newMatr.colmns + j] =
+          oldMatr.data[i * oldMatr.colmns + j];
+    }
+  }
+}
+
+int countNeighbors(MyMatrix matrix, int x, int y) {
+  int sum = 0;
+
+  for (size_t i = -1; i < 2; ++i) {
+    for (size_t j = -1; j < 2; ++j) {
+  
+      int column = (x + j + matrix.colmns) % matrix.colmns;
+      int row = (y + i + matrix.rows) % matrix.rows;
+
+      sum += matrix.data[row * matrix.colmns + column];
+    }
+  }
+
+  sum -= matrix.data[x * matrix.colmns + y];
+
+  return sum;
+}
+
+void computeNextGeneration(MyMatrix matrix, MyMatrix nextMatrix) {
+  for (size_t i = 0; i < matrix.rows; ++i) {
+    for (size_t j = 0; j < matrix.colmns; ++j) {
+      
+      int state = matrix.data[i * matrix.colmns + j];
+
+      int neighborsAmount = countNeighbors(matrix, i, j);
+
+      if(state == 0 && neighborsAmount == 3) {
+        nextMatrix.data[i * nextMatrix.colmns + j] = 1;
+      }
+      else if(state == 1 && (neighborsAmount < 2 || neighborsAmount > 3)) {
+        nextMatrix.data[i * nextMatrix.colmns + j] = 0;
+      }
+      else {
+        nextMatrix.data[i * nextMatrix.colmns + j] =
+            matrix.data[i * nextMatrix.colmns + j] = 0;
+      }
+
+
+    }
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc != 4) {
     std::cout
@@ -66,17 +117,25 @@ int main(int argc, char **argv) {
 
   if (modeToWork == 'r') {
     std::cout << "You're in random mode" << std::endl;
-
   }
 
   if (modeToWork == 'g') {
     std::cout << "You're in Glider mode" << std::endl;
-
     generateGlider(matrixStart);
-
-  } 
-  
+  }
   printMatrixToFile(matrixStart, inputFile);
+
+  MyMatrix matrixCopy = MyMatrix(rowsAmount, columnsAmount);
+  copyMatrix(matrixStart, matrixCopy);
+
+  std::fstream interFile;
+  interFile.open("inter.txt");
+  if (!interFile) {
+    std::cout << "Can't open inter file\n";
+    return 0;
+  }
+
+  computeNextGeneration(matrixStart);
 
   inputFile.close();
 

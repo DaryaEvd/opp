@@ -21,6 +21,20 @@ void generateGlider(MyMatrix matrix) {
   matrix.data[2 * matrix.colmns + 2] = 1;
 }
 
+void generateBlinker(MyMatrix matrix) {
+  matrix.data[1 * matrix.colmns + 2] = 1;
+  matrix.data[2 * matrix.colmns + 2] = 1;
+  matrix.data[3 * matrix.colmns + 2] = 1;
+}
+
+void generateBlock(MyMatrix matrix) {
+  matrix.data[1 * matrix.colmns + 2] = 1;
+  matrix.data[1 * matrix.colmns + 3] = 1;
+
+  matrix.data[2 * matrix.colmns + 2] = 1;
+  matrix.data[2 * matrix.colmns + 3] = 1;
+}
+
 void initMatrixWithZeroes(MyMatrix matrix) {
   for (size_t i = 0; i < matrix.rows; ++i) {
     for (size_t j = 0; j < matrix.colmns; ++j) {
@@ -63,8 +77,8 @@ int countNeighbors(MyMatrix matrix, int xMatr, int yMatr) {
     }
   }
 
-  sum -= matrix.data[xMatr * matrix.colmns + yMatr];
-  std::cout << "SUMMA is: " << sum << std::endl << std::endl;
+  sum -= matrix.data[xMatr * matrix.colmns + yMatr]; //cell itself
+  // std::cout << "SUMMA is: " << sum << std::endl << std::endl;
 
   return sum;
 }
@@ -76,7 +90,7 @@ void computeNextGeneration(MyMatrix matrix, MyMatrix nextMatrix) {
 
       int state = matrix.data[i * matrix.colmns + j];
 
-      std::cout << "CLOWN: " << clown << ": " << state << std::endl;
+      // std::cout << "CLOWN: " << clown << ": " << state << std::endl;
 
       int neighborsAmount = countNeighbors(matrix, i, j);
 
@@ -110,7 +124,8 @@ int main(int argc, char **argv) {
   const char modeToWork = argv[3][0];
 
   std::fstream inputFile;
-  inputFile.open("start.txt");
+  inputFile.open("start.txt", std::ios::in |
+                   std::ios::out | std::ios::trunc);
   if (!inputFile) {
     std::cout << "Can't open input file\n";
     return 0;
@@ -123,14 +138,29 @@ int main(int argc, char **argv) {
     std::cout << "You're in random mode" << std::endl;
   }
 
-  if (modeToWork == 'g') {
+  else if (modeToWork == 'g') {
     std::cout << "You're in Glider mode" << std::endl;
     generateGlider(matrixStart);
   }
+
+  else if (modeToWork == 'b') {
+    std::cout << "You're in Blinker mode" << std::endl;
+    generateBlinker(matrixStart);
+  }
+
+  else if(modeToWork == 's') {
+    std::cout << "You're in Sqare (Block) mode" << std::endl;
+    generateBlock(matrixStart);
+  }
+  else {
+    std::cout << "bad input of mode" << std::endl;
+    return 0;
+  }
+
   printMatrixToFile(matrixStart, inputFile);
 
   std::fstream outputFile;
-  outputFile.open("end.txt");
+  outputFile.open("end.txt", std::ios::out | std::ios::trunc);
   if (!outputFile) {
     std::cout << "Can't open output file\n";
     freeMatrix(matrixStart);
@@ -139,9 +169,18 @@ int main(int argc, char **argv) {
   }
 
   MyMatrix nextGen = MyMatrix(rowsAmount, columnsAmount);
-  computeNextGeneration(matrixStart, nextGen);
 
-  printMatrixToFile(nextGen, outputFile);
+  // const int maxIterations = 10; //change it :)
+
+  for (int i = 0; i < 4; i++) {
+
+    computeNextGeneration(matrixStart, nextGen);
+
+    outputFile << "after iter: " << i << "-----------------" << std::endl;
+    printMatrixToFile(nextGen, outputFile);
+
+    copyMatrix(nextGen, matrixStart);
+  }
 
   inputFile.close();
   outputFile.close();

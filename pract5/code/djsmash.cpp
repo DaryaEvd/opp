@@ -7,23 +7,6 @@ void generateGlider(int *data, int rows, int columns) {
   data[2 * columns + 0] = 1;
   data[2 * columns + 1] = 1;
   data[2 * columns + 2] = 1;
-
-  // data[3 * columns + 4] = 1;
-  // data[0 * columns + 4] = 1;
-}
-
-void generateBlinker(int *data, int rows, int columns) {
-  data[1 * columns + 2] = 1;
-  data[2 * columns + 2] = 1;
-  data[3 * columns + 2] = 1;
-}
-
-void generateBlock(int *data, int rows, int columns) {
-  data[1 * columns + 2] = 1;
-  data[1 * columns + 3] = 1;
-
-  data[2 * columns + 2] = 1;
-  data[2 * columns + 3] = 1;
 }
 
 void initMatrixWithZeroes(int *data, int rows, int columns) {
@@ -91,7 +74,6 @@ void computeNextGeneration(int *oldData, int *nextData, int rows,
       } else {
         nextData[i * columns + j] = oldData[i * columns + j] = state;
       }
-
     }
   }
 }
@@ -109,18 +91,15 @@ bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
 }
 
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    std::cout
-        << "Bad amount of arguments!\n"
-        << "Enter rows amount, then enter columns amount.\n"
-        << "Also enter mode of work 'g' - glider or 'r' - random."
-        << std::endl;
+  if (argc != 3) {
+    std::cout << "Bad amount of arguments!\n"
+              << "Enter rows amount, then enter columns amount.\n"
+              << std::endl;
     return 0;
   }
 
   const int rowsAmount = atoi(argv[1]);
   const int columnsAmount = atoi(argv[2]);
-  const char modeToWork = argv[3][0];
 
   std::fstream inputFile;
   inputFile.open("start.txt",
@@ -129,40 +108,12 @@ int main(int argc, char **argv) {
     std::cout << "Can't open input file\n";
     return 0;
   }
-  
+
   int *currentGen = new int[rowsAmount * columnsAmount]();
 
-  if (modeToWork == 'r') {
-    std::cout << "You're in random mode" << std::endl;
-  }
-
-  else if (modeToWork == 'g') {
-    std::cout << "You're in Glider mode" << std::endl;
-    generateGlider(currentGen, rowsAmount, columnsAmount);
-  }
-
-  // else if (modeToWork == 'b') {
-  //   std::cout << "You're in Blinker mode" << std::endl;
-  //   generateBlinker(currentGen, rowsAmount, columnsAmount);
-  // }
-
-  // else if (modeToWork == 's') {
-  //   std::cout << "You're in Sqare (Block) mode" << std::endl;
-  //   generateBlock(currentGen, rowsAmount, columnsAmount);
-  // } else {
-  //   std::cout << "bad input of mode" << std::endl;
-  //   return 0;
-  // }
+  generateGlider(currentGen, rowsAmount, columnsAmount);
 
   printMatrixToFile(currentGen, rowsAmount, columnsAmount, inputFile);
- 
-  // for(int i = 0; i < rowsAmount; i++) {
-  //   for(int j = 0; j < columnsAmount; j++) {
-  //     std::cout << "cell " << i * columnsAmount + j << " has ";
-  //     int neighbCount = countNeighbors(currentGen, rowsAmount, columnsAmount, i, j);
-  //     std::cout << neighbCount << std::endl;
-  //   }
-  // }
 
   std::fstream outputFile;
   outputFile.open("end.txt", std::ios::out | std::ios::trunc);
@@ -172,23 +123,21 @@ int main(int argc, char **argv) {
     inputFile.close();
     return 0;
   }
-  
+
   outputFile << "start matrix -------------" << std::endl;
-  printMatrixToFile(currentGen, rowsAmount, columnsAmount, outputFile);
+  printMatrixToFile(currentGen, rowsAmount, columnsAmount,
+                    outputFile);
 
   int *nextGen = new int[rowsAmount * columnsAmount]();
-  // printMatrixToFile(nextGen, rowsAmount, columnsAmount, outputFile);
 
-  const int maxIterations = 30; // change it :)
+  const int maxIterations = 25; //
 
   int **prevEvolution = new int *[maxIterations]();
-  // for (int i = 0; i < maxIterations; i++) {
-  //   prevEvolution[i] = new int[rowsAmount * columnsAmount]();
-  // }
 
   int iterations = 0;
+  bool repeated = false;
 
-  while (iterations < maxIterations) {
+  while (iterations < maxIterations && !repeated) {
     prevEvolution[iterations] = new int[rowsAmount * columnsAmount]();
 
     copyMatrix(prevEvolution[iterations], currentGen, rowsAmount,
@@ -196,26 +145,27 @@ int main(int argc, char **argv) {
 
     computeNextGeneration(currentGen, nextGen, rowsAmount,
                           columnsAmount);
-    outputFile << "after iter: " << iterations << "-----------------"
-               << std::endl;
-    printMatrixToFile(nextGen, rowsAmount, columnsAmount, outputFile);
+    // outputFile << "after iter: " << iterations <<
+    // "-----------------"
+    //            << std::endl;
+    // printMatrixToFile(nextGen, rowsAmount, columnsAmount,
+    // outputFile);
 
-    copyMatrix(currentGen, nextGen,rowsAmount, columnsAmount);
+    copyMatrix(currentGen, nextGen, rowsAmount, columnsAmount);
 
-    for (int i = iterations; i >= 0; --i) {
+    for (int i = iterations; i > -1; --i) {
       if (equalsToPrevEvolution(prevEvolution[i], nextGen, rowsAmount,
                                 columnsAmount)) {
-        if(i == 0) {
-          continue;
-        }
-        std::cout << "iter " << iterations << ": equals" << std::endl;
+
+        // std::cout << "iter " << iterations << ": equals" <<
+        // std::endl; // in real: iter + 1
+        repeated = true;
         break;
       }
     }
 
     iterations++;
     // std::cout << "curr iteration: " << iterations << std::endl;
-    
   }
 
   inputFile.close();

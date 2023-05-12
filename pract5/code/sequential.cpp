@@ -130,42 +130,50 @@ int main(int argc, char **argv) {
 
   int *nextGen = new int[rowsAmount * columnsAmount]();
 
-  const int maxIterations = 25; //
+  const long maxIterations = 1000; 
 
   int **prevEvolution = new int *[maxIterations]();
 
-  int iterations = 0;
+  int iterCurr = 0;
   bool repeated = false;
 
-  while (iterations < maxIterations && !repeated) {
-    prevEvolution[iterations] = new int[rowsAmount * columnsAmount]();
+  while (iterCurr < maxIterations && !repeated) {
+    prevEvolution[iterCurr] = new int[rowsAmount * columnsAmount]();
 
-    copyMatrix(prevEvolution[iterations], currentGen, rowsAmount,
+    copyMatrix(prevEvolution[iterCurr], currentGen, rowsAmount,
                columnsAmount);
 
     computeNextGeneration(currentGen, nextGen, rowsAmount,
                           columnsAmount);
-    // outputFile << "after iter: " << iterations <<
-    // "-----------------"
-    //            << std::endl;
-    // printMatrixToFile(nextGen, rowsAmount, columnsAmount,
-    // outputFile);
+    outputFile << "after iter: " << iterCurr <<
+    "-----------------"
+               << std::endl;
+    printMatrixToFile(nextGen, rowsAmount, columnsAmount,
+    outputFile);
 
     copyMatrix(currentGen, nextGen, rowsAmount, columnsAmount);
 
-    for (int i = iterations; i > -1; --i) {
+    for (int i = iterCurr; i > -1; --i) {
       if (equalsToPrevEvolution(prevEvolution[i], nextGen, rowsAmount,
                                 columnsAmount)) {
 
-        // std::cout << "iter " << iterations << ": equals" <<
+        // std::cout << "iter " << iterCurr << ": equals" <<
         // std::endl; // in real: iter + 1
         repeated = true;
         break;
       }
     }
 
-    iterations++;
-    // std::cout << "curr iteration: " << iterations << std::endl;
+    iterCurr++;
+    // std::cout << "curr iteration: " << iterCurr << std::endl;
+  }
+
+  if(repeated) {
+    std::cout << "First repeat of cell automat stage after: "
+      << iterCurr << " iterCurr" << std::endl;
+  }
+  else {
+    std::cout << "Finished after iteration: " << iterCurr << std::endl;
   }
 
   inputFile.close();

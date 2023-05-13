@@ -3,6 +3,24 @@
 #include <iostream>
 #include <mpi.h>
 
+void generateGlider(int *data, int rows, int columns) {
+  data[0 * columns + 1] = 1;
+  data[1 * columns + 2] = 1;
+  data[2 * columns + 0] = 1;
+  data[2 * columns + 1] = 1;
+  data[2 * columns + 2] = 1;
+}
+
+void printMatrixToFile(int *data, int rows, int columns,
+                       std::fstream &file) {
+  for (int i = 0; i < rows; ++i) {
+    for (int j = 0; j < columns; ++j) {
+      file << data[i * columns + j] << " ";
+    }
+    file << "\n";
+  }
+}
+
 int *countRowsForEachProc(int rows, int columns, int amountOfProcs) {
   int *arrayAmountOfRowsPerOneProc = new int[amountOfProcs];
   int minAmountOfRowsPerOneProc = rows / amountOfProcs;
@@ -30,8 +48,6 @@ int main(int argc, char **argv) {
   const int rowsAmount = atoi(argv[1]);
   const int columnsAmount = atoi(argv[2]);
 
-  std::cout << "rows amount: " << rowsAmount << std::endl;
-
   MPI_Init(&argc, &argv);
 
   int amountOfProcs, rankOfCurrProc;
@@ -39,9 +55,23 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &amountOfProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rankOfCurrProc);
 
-  // std::cout << "procs amount: " << amountOfProcs << std::endl;
 
-  int minAmountOfRowsPerOneProc;
+   int *currentGen = new int[rowsAmount * columnsAmount]();
+
+  if (rankOfCurrProc == 0) {
+    std::fstream inputFile;
+    inputFile.open("begin.txt",
+                   std::ios::in | std::ios::out | std::ios::trunc);
+    if (!inputFile) {
+      std::cout << "Can't open input file\n";
+      return 0;
+    }
+
+    generateGlider(currentGen, rowsAmount, columnsAmount);
+
+    printMatrixToFile(currentGen, rowsAmount, columnsAmount,
+                      inputFile);
+  }
 
   int *realAmountOfRowsPerOneProc =
       countRowsForEachProc(rowsAmount, columnsAmount, amountOfProcs);

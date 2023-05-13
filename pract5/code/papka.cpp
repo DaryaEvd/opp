@@ -23,36 +23,37 @@ void printMatrixToFile(int *data, int rows, int columns,
 
 int *countElemsNumInEachProc(int amountOfProcs, int rows,
                              int columns) {
-  int *elemsNum = new int[amountOfProcs];
+  int *elemsNumArray = new int[amountOfProcs];
 
   int basicRowsCount = rows / amountOfProcs;
   int restRowsCount = rows % amountOfProcs;
 
   for (int i = 0; i < amountOfProcs; i++) {
-    elemsNum[i] = basicRowsCount * columns;
+    elemsNumArray[i] = basicRowsCount * columns;
     if (restRowsCount > 0) {
-      elemsNum[i] += columns;
+      elemsNumArray[i] += columns;
       --restRowsCount;
     }
   }
-  return elemsNum;
+  return elemsNumArray;
 }
 
 int *countRowsInEachProcess(const int *elementsNumberArr,
                             int amountOfProcs, int columns) {
-  int *rowsNum = new int[amountOfProcs];
+  int *rowsNumArray = new int[amountOfProcs];
   for (int i = 0; i < amountOfProcs; i++) {
-    rowsNum[i] = elementsNumberArr[i] / columns;
+    rowsNumArray[i] = elementsNumberArr[i] / columns;
   }
-  return rowsNum;
+  return rowsNumArray;
 }
 
-int *createElemsOffsetArr(const int *elemsNum, int amountOfProcs) {
+int *createElemsOffsetArr(const int *elemsNumArray,
+                          int amountOfProcs) {
   int *elementsOffsetArray = new int[amountOfProcs];
   int elementsOffset = 0;
   for (int i = 0; i < amountOfProcs; i++) {
     elementsOffsetArray[i] = elementsOffset;
-    elementsOffset += elemsNum[i];
+    elementsOffset += elemsNumArray[i];
   }
   return elementsOffsetArray;
 }
@@ -65,6 +66,22 @@ int *createRowsOffsetArr(const int *elementsOffsetArray,
   }
 
   return rowsOffsetArray;
+}
+
+// bool *countStopVector(int lengthVector) {
+//   bool *vector = new bool[lengthVector]();
+// }
+
+bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
+                           int columns) {
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < columns; j++) {
+      if (currMatrix[i * columns + j] != prevMatr[i * columns + j]) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 int main(int argc, char **argv) {
@@ -103,16 +120,16 @@ int main(int argc, char **argv) {
   }
 
   // amount of elems, handling each process
-  int *elemsNum = countElemsNumInEachProc(amountOfProcs, rowsAmount,
-                                          columnsAmount);
+  int *elemsNumArray = countElemsNumInEachProc(
+      amountOfProcs, rowsAmount, columnsAmount);
 
   // amount of rows, which each process handles
-  int *rowsNum =
-      countRowsInEachProcess(elemsNum, amountOfProcs, columnsAmount);
+  int *rowsNumArray = countRowsInEachProcess(
+      elemsNumArray, amountOfProcs, columnsAmount);
 
   // count, from which element data sends to each process
   int *elementsOffsetArray =
-      createElemsOffsetArr(elemsNum, amountOfProcs);
+      createElemsOffsetArr(elemsNumArray, amountOfProcs);
 
   // count, from which row data sends to each process
   int *rowsOffsetArray = createRowsOffsetArr(
@@ -120,18 +137,72 @@ int main(int argc, char **argv) {
 
   if (rankOfCurrProc == 0) {
     for (int i = 0; i < amountOfProcs; i++) {
-      std::cout << i << ": " << rowsNum[i] << std::endl;
+      std::cout << i << ": " << rowsNumArray[i] << std::endl;
     }
   }
 
-  int *partMatrGen = new int[elemsNum[rankOfCurrProc]];
+  int *partCurrGen = new int[elemsNumArray[rankOfCurrProc]]();
 
-  MPI_Scatterv(currentGen, elemsNum,
-               elementsOffsetArray, MPI_INT,
-               partMatrGen, elemsNum[rankOfCurrProc],
+  MPI_Scatterv(currentGen, elemsNumArray, elementsOffsetArray,
+               MPI_INT, partCurrGen, elemsNumArray[rankOfCurrProc],
                MPI_INT, 0, MPI_COMM_WORLD);
 
-  
+  int *upperLine = new int[columnsAmount]();
+  int *lowerLine = new int[columnsAmount]();
+
+  const long maxIterations = 1000;
+
+  int **historyOfEvolution =
+      new int *[maxIterations](); // TODO: don't forget to init mem
+
+  int iterCurr = 0;
+  bool repeated = false;
+
+  // determine lower and upper nrighbour
+
+  int rankPrev = rankOfCurrProc - 1;
+  int rankNext = rankOfCurrProc + 1;
+
+  int *nextGen = new int[rowsAmount * columnsAmount]();
+
+  int tagFirstLine = 0;
+  int tagLastLine = 1;
+
+  MPI_Request requestFirstLineSend;
+  MPI_Request requestLastLineSend;
+  MPI_Request requestGetLastLine;
+  MPI_Request requestGetFirstLine;
+
+  while (iterCurr < maxIterations && !repeated) {
+
+    // initiation of sending first line to the prev core
+    MPI_Isend(partCurrGen, elemsNumArray[rankOfCurrProc], MPI_INT,
+              rankPrev, tagFirstLine, MPI_COMM_WORLD,
+              &requestFirstLineSend);
+
+    // initiation of sending last line the to next core
+    MPI_Isend(
+        // partCurrGen[elemsNumArray[rankOfCurrProc] - columnsAmount],
+        &partCurrGen[rowsOffsetArray[rankOfCurrProc] -
+                     1], // mb not -1, but -2, idk yet ...
+        elemsNumArray[rankOfCurrProc], MPI_INT, rankNext, tagLastLine,
+        MPI_COMM_WORLD, &requestLastLineSend);
+
+    // initiation of receiving last line from the previous core
+    MPI_Irecv(upperLine, elemsNumArray[rankOfCurrProc], MPI_INT,
+              rankPrev, tagLastLine, MPI_COMM_WORLD,
+              &requestGetLastLine);
+
+    // initiation of receiving first line from the next core
+    MPI_Irecv(lowerLine, elemsNumArray[rankOfCurrProc], MPI_INT,
+              rankNext, tagFirstLine, MPI_COMM_WORLD,
+              &requestGetFirstLine);
+
+    bool *vectorStopFlag = new bool[iterCurr - 1];
+    for (int core = 0; core < amountOfProcs; core++) {
+      // equalsToPrevEvolution()
+    }
+  }
 
   MPI_Finalize();
   return 0;

@@ -1,7 +1,23 @@
+#include <cmath>
 #include <fstream>
 #include <iostream>
-#include <cmath>
 #include <mpi.h>
+
+int *countRowsForEachProc(int rows, int columns, int amountOfProcs) {
+  int *arrayAmountOfRowsPerOneProc = new int[amountOfProcs];
+  int minAmountOfRowsPerOneProc = rows / amountOfProcs;
+
+  int remainder = rows % amountOfProcs;
+
+  for (int currProc = 0; currProc < amountOfProcs; currProc++) {
+    arrayAmountOfRowsPerOneProc[currProc] = minAmountOfRowsPerOneProc;
+
+    if (currProc < remainder) {
+      arrayAmountOfRowsPerOneProc[currProc]++;
+    }
+  }
+  return arrayAmountOfRowsPerOneProc;
+}
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -14,7 +30,7 @@ int main(int argc, char **argv) {
   const int rowsAmount = atoi(argv[1]);
   const int columnsAmount = atoi(argv[2]);
 
-  std::cout << "rows amount: " <<  rowsAmount << std::endl;
+  std::cout << "rows amount: " << rowsAmount << std::endl;
 
   MPI_Init(&argc, &argv);
 
@@ -27,38 +43,15 @@ int main(int argc, char **argv) {
 
   int minAmountOfRowsPerOneProc;
 
-  int realAmountOfRowsPerOneProc[amountOfProcs];
+  int *realAmountOfRowsPerOneProc =
+      countRowsForEachProc(rowsAmount, columnsAmount, amountOfProcs);
 
-  if (rowsAmount % amountOfProcs == 0) {
-    minAmountOfRowsPerOneProc = rowsAmount / amountOfProcs;
-
-    if (rankOfCurrProc == 0) {
-      std::cout << "min am: " << minAmountOfRowsPerOneProc
+  if (rankOfCurrProc == 0) {
+    for (int i = 0; i < amountOfProcs; i++) {
+      std::cout << i << ": " << realAmountOfRowsPerOneProc[i]
                 << std::endl;
     }
-  } else {
-    minAmountOfRowsPerOneProc = rowsAmount / amountOfProcs ;
-
-    // std::cout << "cloooown" << std::endl;
-
-    for(int i = 0; i < amountOfProcs; i++) {
-      realAmountOfRowsPerOneProc[i] = minAmountOfRowsPerOneProc;
-
-      if(i < (rowsAmount % amountOfProcs)) {
-        realAmountOfRowsPerOneProc[i]++;
-      }
-    }
-
-    if (rankOfCurrProc == 0) {
-      for (int i = 0; i < amountOfProcs; i++) {
-        std::cout << "proc " << i
-                  << ", realAmount: " << realAmountOfRowsPerOneProc[i]
-                  << std::endl;
-      }
-    }
   }
-
-  // std::cout << minAmountOfRowsPerOneProc << std::endl;
 
   MPI_Finalize();
   return 0;

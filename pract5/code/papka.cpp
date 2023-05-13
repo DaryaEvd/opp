@@ -21,20 +21,50 @@ void printMatrixToFile(int *data, int rows, int columns,
   }
 }
 
-int *countRowsForEachProc(int rows, int columns, int amountOfProcs) {
-  int *arrayAmountOfRowsPerOneProc = new int[amountOfProcs];
-  int minAmountOfRowsPerOneProc = rows / amountOfProcs;
+int *countElemsNumInEachProc(int amountOfProcs, int rows,
+                             int columns) {
+  int *elemsNum = new int[amountOfProcs];
 
-  int remainder = rows % amountOfProcs;
+  int basicRowsCount = rows / amountOfProcs;
+  int restRowsCount = rows % amountOfProcs;
 
-  for (int currProc = 0; currProc < amountOfProcs; currProc++) {
-    arrayAmountOfRowsPerOneProc[currProc] = minAmountOfRowsPerOneProc;
-
-    if (currProc < remainder) {
-      arrayAmountOfRowsPerOneProc[currProc]++;
+  for (int i = 0; i < amountOfProcs; i++) {
+    elemsNum[i] = basicRowsCount * columns;
+    if (restRowsCount > 0) {
+      elemsNum[i] += columns;
+      --restRowsCount;
     }
   }
-  return arrayAmountOfRowsPerOneProc;
+  return elemsNum;
+}
+
+int *countRowsInEachProcess(const int *elementsNumberArr,
+                            int amountOfProcs, int columns) {
+  int *rowsNum = new int[amountOfProcs];
+  for (int i = 0; i < amountOfProcs; i++) {
+    rowsNum[i] = elementsNumberArr[i] / columns;
+  }
+  return rowsNum;
+}
+
+int *createElemsOffsetArr(const int *elemsNum, int amountOfProcs) {
+  int *elementsOffsetArray = new int[amountOfProcs];
+  int elementsOffset = 0;
+  for (int i = 0; i < amountOfProcs; i++) {
+    elementsOffsetArray[i] = elementsOffset;
+    elementsOffset += elemsNum[i];
+  }
+  return elementsOffsetArray;
+}
+
+int *createRowsOffsetArr(const int *elementsOffsetArray,
+                         int amountOfProcs, int rows) {
+  int *rowsOffsetArray = new int[amountOfProcs];
+  for (int i = 0; i < amountOfProcs; i++) {
+    rowsOffsetArray[i] = elementsOffsetArray[i] / rows;
+  }
+
+  return rowsOffsetArray;
 }
 
 int main(int argc, char **argv) {
@@ -55,8 +85,7 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &amountOfProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rankOfCurrProc);
 
-
-   int *currentGen = new int[rowsAmount * columnsAmount]();
+  int *currentGen = new int[rowsAmount * columnsAmount]();
 
   if (rankOfCurrProc == 0) {
     std::fstream inputFile;
@@ -73,13 +102,25 @@ int main(int argc, char **argv) {
                       inputFile);
   }
 
-  int *realAmountOfRowsPerOneProc =
-      countRowsForEachProc(rowsAmount, columnsAmount, amountOfProcs);
+  // amount of elems, handling each process
+  int *elemsNum = countElemsNumInEachProc(amountOfProcs, rowsAmount,
+                                          columnsAmount);
+
+  // amount of rows, which each process handles
+  int *rowsNum =
+      countRowsInEachProcess(elemsNum, amountOfProcs, columnsAmount);
+
+  // count, from which element data sends to each process
+  int *elementsOffsetArray =
+      createElemsOffsetArr(elemsNum, amountOfProcs);
+
+  // count, from which row data sends to each process
+  int *rowsOffsetArray = createRowsOffsetArr(
+      elementsOffsetArray, amountOfProcs, rowsAmount);
 
   if (rankOfCurrProc == 0) {
     for (int i = 0; i < amountOfProcs; i++) {
-      std::cout << i << ": " << realAmountOfRowsPerOneProc[i]
-                << std::endl;
+      std::cout << i << ": " << rowsNum[i] << std::endl;
     }
   }
 

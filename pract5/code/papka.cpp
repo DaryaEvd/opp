@@ -124,6 +124,15 @@ int main(int argc, char **argv) {
     }
   }
 
+  int *partMatrGen = new int[elemsNum[rankOfCurrProc]];
+
+  MPI_Scatterv(currentGen, elemsNum,
+               elementsOffsetArray, MPI_INT,
+               partMatrGen, elemsNum[rankOfCurrProc],
+               MPI_INT, 0, MPI_COMM_WORLD);
+
+  
+
   MPI_Finalize();
   return 0;
 }

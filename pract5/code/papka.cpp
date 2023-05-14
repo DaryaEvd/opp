@@ -178,6 +178,7 @@ int main(int argc, char **argv) {
 
   const int rowsAmount = atoi(argv[1]);
   const int columnsAmount = atoi(argv[2]);
+  const long maxIterations = 1000;
 
   MPI_Init(&argc, &argv);
 
@@ -186,7 +187,8 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &amountOfProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rankOfCurrProc);
 
-  const long maxIterations = 1000;
+  double startt, endt;
+
   int **historyOfEvolution =
       new int *[maxIterations](); // TODO: don't forget to init mem
 
@@ -246,13 +248,19 @@ int main(int argc, char **argv) {
   int iterCurr = 0;
   bool repeated = false;
 
+  if (rankOfCurrProc == 0) {
+    startt = MPI_Wtime();
+  }
   while (!repeated) {
 
     historyOfEvolution[iterCurr + 1] =
         new int[((rowsNumArray[rankOfCurrProc] + 2) * columnsAmount)];
 
-    currentGen = historyOfEvolution[iterCurr];
-    nextGen = historyOfEvolution[iterCurr + 1];
+    // currentGen = historyOfEvolution[iterCurr];
+    // nextGen = historyOfEvolution[iterCurr + 1];
+
+    historyOfEvolution[iterCurr] = currentGen;
+    currentGen = nextGen;
 
     // // 1 - initiation of sending first line to the prev core
     MPI_Isend(&currentGen[columnsAmount], columnsAmount, MPI_INT,
@@ -320,8 +328,8 @@ int main(int argc, char **argv) {
         &nextGen[(rowsNumArray[rankOfCurrProc] - 3) * columnsAmount],
         3, columnsAmount);
 
-    std::copy(nextGen, &nextGen[elemsNumArray[rankOfCurrProc]],
-              currentGen);
+    // std::copy(nextGen, &nextGen[elemsNumArray[rankOfCurrProc]],
+    //           currentGen);
 
     if (iterCurr > 1) {
       // 14 - wait end of exchanginf stop vectors with each other
@@ -337,6 +345,9 @@ int main(int argc, char **argv) {
       delete[] stopVector;
       delete[] stopMatrix;
     }
+
+    // printMatrixToFile(currentGen, rowsNumArray[rankOfCurrProc],
+    //                   columnsAmount, inputFile);
 
     iterCurr++;
   }

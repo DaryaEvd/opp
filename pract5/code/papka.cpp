@@ -104,7 +104,7 @@ void computeNextGeneration(int *oldData, int *nextData, int rows,
 
       int state = oldData[i * columns + j];
 
-      std::cout << i << " " << j << "   ";
+      // std::cout << i << " " << j << "   ";
       int neighborsAmount =
           countNeighbors(oldData, rows, columns, i, j);
 
@@ -147,6 +147,25 @@ bool *calcVector(int **historyOfEvolution, int *currentGen, int iter,
                                           currentGen, size);
   }
   return vectorStop;
+}
+
+// iter - x
+// amountOfProcs - y
+bool isEnd(bool *stopMatrix, int iter, int amountOfProcs) {
+  for (int x = 0; x < iter; x++) {
+    int count = 0;
+
+    for (int y = 0; y < amountOfProcs; y++) {
+      if (stopMatrix[y * iter + x]) {
+        count++;
+      }
+    }
+
+    if (count == amountOfProcs) {
+      return true;
+    }
+  }
+  return false;
 }
 
 int main(int argc, char **argv) {
@@ -257,10 +276,6 @@ int main(int argc, char **argv) {
               MPI_COMM_WORLD, &requestGetFirstLine);
 
     // // 5 - count vector of stop flags
-    // countStopFlags(historyOfEvolution, vectorStopFlagPerIter,
-    //                aliveCells, rowsNumArray, iterCurr,
-    //                rankOfCurrProc, amountOfProcs,
-    //                rowsNumArray[rankOfCurrProc], columnsAmount);
 
     bool *stopMatrix;
     bool *stopVector;
@@ -273,18 +288,14 @@ int main(int argc, char **argv) {
 
       // // 6 - init changing of stop vectors with all cores
       MPI_Iallgather(stopVector, iterCurr - 1, MPI_C_BOOL, stopMatrix,
-                     elemsNumArray[rankOfCurrProc], MPI_C_BOOL,
-                     MPI_COMM_WORLD, &requestVector);
+                     iterCurr - 1, MPI_C_BOOL, MPI_COMM_WORLD,
+                     &requestVector);
     }
 
-    // MPI_Ialltoall(vectorStopFlagPerIter, iterCurr, MPI_C_BOOL,
-    //               allStopVectors, iterCurr, MPI_C_BOOL,
-    //               MPI_COMM_WORLD, &requestVector);
-
     // // 7 - count stages of rows, except first and last line
-    // computeNextGeneration(&currentGen[columnsAmount], nextGen,
-    //                       rowsNumArray[rankOfCurrProc] - 1,
-    //                       columnsAmount);
+    computeNextGeneration(
+        &currentGen[columnsAmount], &nextGen[columnsAmount],
+        rowsNumArray[rankOfCurrProc] - 2, columnsAmount);
 
     // // 8 - wait end sending 1st line to prev core
     MPI_Wait(&requestSendFirstLine, &status);
@@ -308,10 +319,17 @@ int main(int argc, char **argv) {
     //                 columnsAmount],
     //     &nextGen[(rowsNumArray[rankOfCurrProc] - 3) *
     //     columnsAmount], 3, columnsAmount);
+
     // // 14 - wait end of exchanginf stop vectors with each other
     // // process
-    MPI_Wait(&requestVector, &status);
     if (iterCurr > 1) {
+      MPI_Wait(&requestVector, MPI_STATUS_IGNORE);
+
+      // if (isEnd(stopMatrix, iterCurr - 1, amountOfProcs)) {
+      //   repeated = true;
+      //   break;
+      // }
+
       delete[] stopVector;
       delete[] stopMatrix;
     }
@@ -335,13 +353,13 @@ int main(int argc, char **argv) {
 
   inputFile.close();
 
-  // delete[] currentGen;
-  // delete[] nextGen;
+  delete[] elemsNumArray;
+  delete[] rowsNumArray;
 
-  // for (int i = 0; i < maxIterations; i++) {
-  //   delete[] historyOfEvolution[i];
-  // }
-  // delete[] historyOfEvolution;
+  for (int i = 0; i < maxIterations; i++) {
+    delete[] historyOfEvolution[i];
+  }
+  delete[] historyOfEvolution;
 
   MPI_Finalize();
   return 0;

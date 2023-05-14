@@ -200,8 +200,8 @@ int main(int argc, char **argv) {
   int *rowsNumArray = countRowsInEachProcess(
       elemsNumArray, amountOfProcs, columnsAmount);
 
-  // historyOfEvolution[0] =
-  // new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
+  historyOfEvolution[0] =
+      new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
 
   int *currentGen =
       new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
@@ -218,16 +218,11 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-    // generateGlider(historyOfEvolution[0], rowsAmount,
-    // columnsAmount);
+    generateGlider(currentGen, rowsNumArray[rankOfCurrProc] + 2,
+                   columnsAmount);
 
-    generateGlider(currentGen, rowsAmount, columnsAmount);
-
-    // printMatrixToFile(historyOfEvolution[0], rowsAmount,
-    // columnsAmount, inputFile);
-
-    printMatrixToFile(currentGen, rowsAmount, columnsAmount,
-                      inputFile);
+    printMatrixToFile(currentGen, rowsNumArray[rankOfCurrProc] + 2,
+                      columnsAmount, inputFile);
   }
 
   std::fstream outputFile;
@@ -352,6 +347,7 @@ int main(int argc, char **argv) {
 
       // 15 - compare vectors of stop
       if (isEnd(stopMatrix, iterCurr - 1, amountOfProcs)) {
+        std::cout << "i am here" << std::endl;
         repeated = true;
         // break;
       }
@@ -360,32 +356,31 @@ int main(int argc, char **argv) {
       delete[] stopMatrix;
     }
 
-    if (rankOfCurrProc == 0) {
-      printMatrixToFile(currentGen, rowsAmount, columnsAmount,
-                        outputFile);
-    }
-
-    // std::copy(nextGen, &nextGen[rowsAmount * columnsAmount],
-    //           currentGen);
-
-    // std::copy(currentGen, currentGen[rowsAmount * columnsAmount],
-    //           &historyOfEvolution[iterCurr]);
-
     historyOfEvolution[iterCurr] = currentGen;
     currentGen = nextGen;
+
+    if (rankOfCurrProc == 0) {
+      printMatrixToFile(historyOfEvolution[iterCurr], rowsAmount,
+                        columnsAmount, outputFile);
+    }
 
     iterCurr++;
   }
 
   if (repeated) {
-    std::cout << "First repeat of cell automat stage after: "
-              << iterCurr << " iterCurr" << std::endl;
+    if (rankOfCurrProc == 0) {
+      std::cout << "First repeat of cell automat stage after: "
+                << iterCurr - 1 << " iterCurr" << std::endl;
+    }
   } else {
-    std::cout << "Finished after iteration: " << iterCurr
-              << std::endl;
+    if (rankOfCurrProc == 0) {
+      std::cout << "Finished after iteration: " << iterCurr
+                << std::endl;
+    }
   }
 
   inputFile.close();
+  outputFile.close();
 
   delete[] elemsNumArray;
   delete[] rowsNumArray;

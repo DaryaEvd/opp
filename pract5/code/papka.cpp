@@ -76,22 +76,6 @@ void copyMatrix(int *dest, int *src, int rows, int columns) {
   }
 }
 
-// bool *countStopVector(int lengthVector) {
-//   bool *vector = new bool[lengthVector]();
-// }
-
-bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
-                           int columns) {
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
-      if (currMatrix[i * columns + j] != prevMatr[i * columns + j]) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // x - rows, y - columns
 int countNeighbors(int *data, int rows, int columns, int xMatr,
                    int yMatr) {
@@ -148,7 +132,25 @@ bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
   return true;
 }
 
-void countStopVector() {}
+void countStopVector(int **history, int *matrix, int *stopFlags,
+                     int iteration, int rows, int columns) {
+  int componentVector;
+
+  for (int i = 0; i < iteration; i++) {
+    componentVector = 1;
+
+    if (!equalsToPrevEvolution(history[i], matrix, rows, columns)) {
+      componentVector = 0;
+      break;
+    }
+
+    if(componentVector == 0) {
+      break;
+    }
+
+    stopFlags[i] = componentVector;
+  }
+}
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -242,11 +244,11 @@ int main(int argc, char **argv) {
 
   MPI_Status status;
 
-  bool *matrixStopFlag = new bool[maxIterations * amountOfProcs];
-  bool *vectorStopFlag = new bool[maxIterations];
+  int *matrixStopFlag = new int[maxIterations * amountOfProcs];
+  int *vectorStopFlag = new int[maxIterations];
 
   for (int i = 0; i < maxIterations; i++) {
-    vectorStopFlag[i] = false;
+    vectorStopFlag[i] = 0;
   }
 
   while (iterCurr < maxIterations && !repeated) {
@@ -271,23 +273,27 @@ int main(int argc, char **argv) {
     MPI_Irecv(lowerLine, columnsAmount, MPI_INT, rankNext,
               tagFirstLine, MPI_COMM_WORLD, &requestGetFirstLine);
 
-    historyOfEvolution[iterCurr] =
-        new int[elemsNumArray[rankOfCurrProc]]();
+    // historyOfEvolution[iterCurr] =
+    //     new int[elemsNumArray[rankOfCurrProc]]();
 
-    copyMatrix(historyOfEvolution, partCurrGen,
-               rowsNumArray[iterCurr], columnsAmount);
+    // copyMatrix(historyOfEvolution, partCurrGen,
+    //            rowsNumArray[iterCurr], columnsAmount);
 
-    // countStopVector();
-    for (int i = iterCurr; i > -1; i--) {
-      if (equalsToPrevEvolution(
-              historyOfEvolution[iterCurr], partCurrGen,
-              rowsNumArray[rankOfCurrProc], columnsAmount)) {
-          vectorStopFlag[i] = 1;
-      }
-      else {
-        vectorStopFlag[i] = 0;
-      }
-    }
+    // copyMatrix(currentGen, nextGen, rowsNumArray[iterCurr],
+    //            columnsAmount);
+
+    // for (int i = iterCurr; i > -1; i--) {
+    //   if (equalsToPrevEvolution(
+    //           historyOfEvolution[iterCurr], partCurrGen,
+    //           rowsNumArray[rankOfCurrProc], columnsAmount)) {
+    //     vectorStopFlag[i] = 1;
+    //   } else {
+    //     vectorStopFlag[i] = 0;
+    //   }
+    // }
+
+    countStopVector(historyOfEvolution, partCurrGen, vectorStopFlag,
+                    iterCurr, rowsNumArray[iterCurr], columnsAmount);
 
     // 7 - count stages of rows, except first and last line
     computeNextGeneration(partCurrGen, partNextGen, rowsAmount,

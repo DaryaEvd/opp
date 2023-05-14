@@ -213,10 +213,12 @@ int main(int argc, char **argv) {
   int *rowsNumArray = countRowsInEachProcess(
       elemsNumArray, amountOfProcs, columnsAmount);
 
-  historyOfEvolution[0] = new int[rowsNumArray[rankOfCurrProc] + 2]();
+  historyOfEvolution[0] =
+      new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
 
+  std::fstream inputFile;
   if (rankOfCurrProc == 0) {
-    std::fstream inputFile;
+
     inputFile.open("begin.txt",
                    std::ios::in | std::ios::out | std::ios::trunc);
     if (!inputFile) {
@@ -245,8 +247,8 @@ int main(int argc, char **argv) {
   int tagFirstLine = 0;
   int tagLastLine = 1;
 
-  MPI_Request requestFirstLineSend;
-  MPI_Request requestLastLineSend;
+  MPI_Request requestSendFirstLine;
+  MPI_Request requestSendLastLine;
   MPI_Request requestGetLastLine;
   MPI_Request requestGetFirstLine;
   MPI_Request requestVector;
@@ -267,82 +269,96 @@ int main(int argc, char **argv) {
     currentGen = historyOfEvolution[iterCurr];
     nextGen = historyOfEvolution[iterCurr + 1];
 
-    // 1 - initiation of sending first line to the prev core
+    // // 1 - initiation of sending first line to the prev core
     MPI_Isend(&currentGen[columnsAmount], columnsAmount, MPI_INT,
               rankPrev, tagFirstLine, MPI_COMM_WORLD,
-              &requestFirstLineSend);
+              &requestSendFirstLine);
 
-    // 2 - initiation of sending last line the to next core
+    // // 2 - initiation of sending last line the to next core
     MPI_Isend(
         &currentGen[(rowsNumArray[rankOfCurrProc]) * columnsAmount],
         columnsAmount, MPI_INT, rankNext, tagLastLine, MPI_COMM_WORLD,
-        &requestLastLineSend);
+        &requestSendLastLine);
 
-    // 3 - initiation of receiving last line from the previous core
+    // // 3 - initiation of receiving last line from the previous core
     MPI_Irecv(currentGen, columnsAmount, MPI_INT, rankPrev,
               tagLastLine, MPI_COMM_WORLD, &requestGetLastLine);
 
-    // 4 - initiation of receiving first line from the next core
+    // // 4 - initiation of receiving first line from the next core
     MPI_Irecv(&currentGen[(rowsNumArray[rankOfCurrProc] + 1) *
                           columnsAmount],
               columnsAmount, MPI_INT, rankNext, tagFirstLine,
               MPI_COMM_WORLD, &requestGetFirstLine);
 
-    // 5 - count vector of stop flags
-    countStopFlags(historyOfEvolution, vectorStopFlagPerIter,
-                   rowsNumArray, iterCurr, rankOfCurrProc,
-                   amountOfProcs, rowsNumArray[rankOfCurrProc],
-                   columnsAmount);
+    // // 5 - count vector of stop flags
+    // countStopFlags(historyOfEvolution, vectorStopFlagPerIter,
+    //                rowsNumArray, iterCurr, rankOfCurrProc,
+    //                amountOfProcs, rowsNumArray[rankOfCurrProc],
+    //                columnsAmount);
 
-    // 6 - init changing of stop vectors with all cores
-    MPI_Ialltoall(vectorStopFlagPerIter, iterCurr, MPI_C_BOOL,
-                  allStopVectors, iterCurr, MPI_C_BOOL,
-                  MPI_COMM_WORLD, &requestVector);
+    // // 6 - init changing of stop vectors with all cores
+    // MPI_Ialltoall(vectorStopFlagPerIter, iterCurr, MPI_C_BOOL,
+    //               allStopVectors, iterCurr, MPI_C_BOOL,
+    //               MPI_COMM_WORLD, &requestVector);
 
-    // 7 - count stages of rows, except first and last line
-    computeNextGeneration(&currentGen[columnsAmount], nextGen,
-                          rowsNumArray[rankOfCurrProc] - 1,
-                          columnsAmount);
+    // // 7 - count stages of rows, except first and last line
+    // computeNextGeneration(&currentGen[columnsAmount], nextGen,
+    //                       rowsNumArray[rankOfCurrProc] - 1,
+    //                       columnsAmount);
 
-    // 8 - wait end sending 1st line to prev core
-    MPI_Wait(&requestFirstLineSend, &status);
+    // // 8 - wait end sending 1st line to prev core
+    MPI_Wait(&requestSendFirstLine, &status);
 
     // 9 - wait end of receiving from the 3rd step
     MPI_Wait(&requestGetLastLine, &status);
 
-    // 10 - count stages of the first line
-    // computeNextGenerationInFirstLine()
-    computeNextGeneration(currentGen, nextGen, 3, columnsAmount);
+    // // 10 - count stages of the first line
+    // // computeNextGenerationInFirstLine()
+    // computeNextGeneration(currentGen, nextGen, 3, columnsAmount);
 
-    // 11 - wait end sending last line to the next core
-    MPI_Wait(&requestLastLineSend, &status);
+    // // 11 - wait end sending last line to the next core
+    MPI_Wait(&requestSendLastLine, &status);
 
-    // 12 - wait end receiving
+    // // 12 - wait end receiving
     MPI_Wait(&requestGetFirstLine, &status);
 
-    // 13 - count stages of the last line
-    computeNextGeneration(
-        &currentGen[(rowsNumArray[rankOfCurrProc] - 3) *
-                    columnsAmount],
-        &nextGen[(rowsNumArray[rankOfCurrProc] - 3) * columnsAmount],
-        3, columnsAmount);
-    // 14 - wait end of exchanginf stop vectors with each other
-    // process
-    MPI_Wait(&requestVector, &status);
+    // // 13 - count stages of the last line
+    // computeNextGeneration(
+    //     &currentGen[(rowsNumArray[rankOfCurrProc] - 3) *
+    //                 columnsAmount],
+    //     &nextGen[(rowsNumArray[rankOfCurrProc] - 3) *
+    //     columnsAmount], 3, columnsAmount);
+    // // 14 - wait end of exchanginf stop vectors with each other
+    // // process
+    // MPI_Wait(&requestVector, &status);
 
-    // 15 - compare vectors of stop
-    if (checkComparison(allStopVectors, iterCurr, rankOfCurrProc,
-                         amountOfProcs)) {
-      repeated = true;
-      break;
-    }
+    // // 15 - compare vectors of stop
+    // if (checkComparison(allStopVectors, iterCurr, rankOfCurrProc,
+    //                     amountOfProcs)) {
+    //   repeated = true;
+    //   break;
+    // }
 
     iterCurr++;
   }
 
   if (repeated) {
-    std::cout << "repeated " << std::endl;
+    std::cout << "First repeat of cell automat stage after: "
+              << iterCurr << " iterCurr" << std::endl;
+  } else {
+    std::cout << "Finished after iteration: " << iterCurr
+              << std::endl;
   }
+
+  inputFile.close();
+
+  // delete[] currentGen;
+  // delete[] nextGen;
+
+  // for (int i = 0; i < maxIterations; i++) {
+  //   delete[] historyOfEvolution[i];
+  // }
+  // delete[] historyOfEvolution;
 
   MPI_Finalize();
   return 0;

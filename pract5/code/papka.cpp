@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
   MPI_Status status;
 
   bool *vectorStopFlagPerIter = new bool[maxIterations];
-  bool *allStopFVetors = new bool[maxIterations * amountOfProcs];
+  bool *allStopVectors = new bool[maxIterations * amountOfProcs];
 
   int iterCurr = 0;
   bool repeated = false;
@@ -285,18 +285,23 @@ int main(int argc, char **argv) {
                    columnsAmount);
 
     // 6 - init changing of stop vectors with all cores
+    MPI_Ialltoall(vectorStopFlagPerIter, iterCurr, MPI_C_BOOL,
+                  allStopVectors, iterCurr, MPI_C_BOOL,
+                  MPI_COMM_WORLD, &requestVector);
 
     // 7 - count stages of rows, except first and last line
+    computeNextGeneration(currentGen, nextGen,
+                          rowsNumArray[rankOfCurrProc], columnsAmount);
 
-    // 8 - wait end receiving from the 2nd step
-    // MPI_Wait(&requestLastLineSend, &status);
+        // 8 - wait end receiving from the 2nd step
+        // MPI_Wait(&requestLastLineSend, &status);
 
-    // 9 - wait end of receiving from the 3rd step
-    // MPI_Wait(&requestGetLastLine, &status);
+        // 9 - wait end of receiving from the 3rd step
+        // MPI_Wait(&requestGetLastLine, &status);
 
-    // 10 - count stages of the first line
+        // 10 - count stages of the first line
 
-    iterCurr++;
+        iterCurr++;
   }
 
   MPI_Finalize();

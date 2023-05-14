@@ -200,8 +200,13 @@ int main(int argc, char **argv) {
   int *rowsNumArray = countRowsInEachProcess(
       elemsNumArray, amountOfProcs, columnsAmount);
 
-  historyOfEvolution[0] =
+  // historyOfEvolution[0] =
+  // new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
+
+  int *currentGen =
       new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
+  // = new int[rowsAmount * columnsAmount]();
+  int *nextGen; // = new int[rowsAmount * columnsAmount]();
 
   std::fstream inputFile;
   if (rankOfCurrProc == 0) {
@@ -213,10 +218,26 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-    generateGlider(historyOfEvolution[0], rowsAmount, columnsAmount);
+    // generateGlider(historyOfEvolution[0], rowsAmount,
+    // columnsAmount);
 
-    printMatrixToFile(historyOfEvolution[0], rowsAmount,
-                      columnsAmount, inputFile);
+    generateGlider(currentGen, rowsAmount, columnsAmount);
+
+    // printMatrixToFile(historyOfEvolution[0], rowsAmount,
+    // columnsAmount, inputFile);
+
+    printMatrixToFile(currentGen, rowsAmount, columnsAmount,
+                      inputFile);
+  }
+
+  std::fstream outputFile;
+  if (rankOfCurrProc == 0) {
+    outputFile.open("end.txt", std::ios::out | std::ios::trunc);
+    if (!outputFile) {
+      std::cout << "Can't open output file\n";
+      inputFile.close();
+      return 0;
+    }
   }
 
   if (rankOfCurrProc == 0) {
@@ -224,9 +245,6 @@ int main(int argc, char **argv) {
       std::cout << i << ": " << rowsNumArray[i] << std::endl;
     }
   }
-
-  int *currentGen; // = new int[rowsAmount * columnsAmount]();
-  int *nextGen;    // = new int[rowsAmount * columnsAmount]();
 
   int rankPrev = (amountOfProcs + rankOfCurrProc - 1) % amountOfProcs;
   int rankNext = (amountOfProcs + rankOfCurrProc + 1) % amountOfProcs;
@@ -252,15 +270,14 @@ int main(int argc, char **argv) {
     startt = MPI_Wtime();
   }
   while (!repeated) {
-
-    historyOfEvolution[iterCurr + 1] =
-        new int[((rowsNumArray[rankOfCurrProc] + 2) * columnsAmount)];
+    nextGen =
+        new int[(rowsNumArray[rankOfCurrProc] + 2) * columnsAmount]();
 
     // currentGen = historyOfEvolution[iterCurr];
     // nextGen = historyOfEvolution[iterCurr + 1];
 
-    historyOfEvolution[iterCurr] = currentGen;
-    currentGen = nextGen;
+    // historyOfEvolution[iterCurr] = currentGen;
+    // currentGen = nextGen;
 
     // // 1 - initiation of sending first line to the prev core
     MPI_Isend(&currentGen[columnsAmount], columnsAmount, MPI_INT,
@@ -328,9 +345,6 @@ int main(int argc, char **argv) {
         &nextGen[(rowsNumArray[rankOfCurrProc] - 3) * columnsAmount],
         3, columnsAmount);
 
-    // std::copy(nextGen, &nextGen[elemsNumArray[rankOfCurrProc]],
-    //           currentGen);
-
     if (iterCurr > 1) {
       // 14 - wait end of exchanginf stop vectors with each other
       // process
@@ -346,8 +360,19 @@ int main(int argc, char **argv) {
       delete[] stopMatrix;
     }
 
-    // printMatrixToFile(currentGen, rowsNumArray[rankOfCurrProc],
-    //                   columnsAmount, inputFile);
+    if (rankOfCurrProc == 0) {
+      printMatrixToFile(currentGen, rowsAmount, columnsAmount,
+                        outputFile);
+    }
+
+    // std::copy(nextGen, &nextGen[rowsAmount * columnsAmount],
+    //           currentGen);
+
+    // std::copy(currentGen, currentGen[rowsAmount * columnsAmount],
+    //           &historyOfEvolution[iterCurr]);
+
+    historyOfEvolution[iterCurr] = currentGen;
+    currentGen = nextGen;
 
     iterCurr++;
   }

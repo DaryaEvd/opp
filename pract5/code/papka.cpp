@@ -173,6 +173,16 @@ void countStopFlags(int **historyOfEvolution, bool *stopFlag,
   }
 }
 
+bool checkComparison(bool *allStopVectors, int iteration,
+                     int amountOfProcs, int rankOfCurrProc) {
+  for (int i = 0; i < iteration; i++) {
+    if (allStopVectors[i] == false) {
+      return false;
+    }
+  }
+  return true;
+}
+
 int main(int argc, char **argv) {
   if (argc != 3) {
     std::cout << "Bad amount of arguments!\n"
@@ -290,18 +300,43 @@ int main(int argc, char **argv) {
                   MPI_COMM_WORLD, &requestVector);
 
     // 7 - count stages of rows, except first and last line
-    computeNextGeneration(currentGen, nextGen,
-                          rowsNumArray[rankOfCurrProc], columnsAmount);
+    computeNextGeneration(&currentGen[columnsAmount], nextGen,
+                          rowsNumArray[rankOfCurrProc] - 1,
+                          columnsAmount);
 
-        // 8 - wait end receiving from the 2nd step
-        // MPI_Wait(&requestLastLineSend, &status);
+    // 8 - wait end sending 1st line to prev core
+    MPI_Wait(&requestFirstLineSend, &status);
 
-        // 9 - wait end of receiving from the 3rd step
-        // MPI_Wait(&requestGetLastLine, &status);
+    // 9 - wait end of receiving from the 3rd step
+    MPI_Wait(&requestGetLastLine, &status);
 
-        // 10 - count stages of the first line
+    // 10 - count stages of the first line
+    // computeNextGenerationInFirstLine()
+    computeNextGeneration(currGen, nextGen, 3, columnsAmount);
 
-        iterCurr++;
+    // 11 - wait end sending last line to the next core
+    MPI_Wait(&requestLastLineSend, &status);
+
+    // 12 - wait end receiving
+    MPI_Wait(&requestGetFirstLine, &status);
+
+    // 13 - count stages of the last line
+    computeNextGeneration(
+        &currentGen[(rowsNumArray[rankOfCurrProc] - 3) *
+                    columnsAmount],
+        &nextGen[(rowsNumArray[rankOfCurrProc] - 3) * columnsAmount],
+        3, columnsAmount);
+    // 14 - wait end of exchanginf stop vectors with each other
+    // process
+    MPI_Wait(&requestVector, &status);
+
+    // 15 - compare vectors of stop
+    if (checkComparison((allStopVectors, iterCurr, rankOfCurrProc,
+                         amountOfProcs))) {
+      break;
+    }
+
+    iterCurr++;
   }
 
   MPI_Finalize();

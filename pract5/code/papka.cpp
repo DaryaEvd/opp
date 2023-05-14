@@ -120,67 +120,33 @@ void computeNextGeneration(int *oldData, int *nextData, int rows,
   }
 }
 
-bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
-                           int columns) {
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < columns; j++) {
-      if (currMatrix[i * columns + j] != prevMatr[i * columns + j]) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
+bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int size) {
+  // for (int i = 0; i < rows; i++) {
+  //   for (int j = 0; j < columns; j++) {
+  //     if (currMatrix[i * columns + j] != prevMatr[i * columns + j])
+  //     {
+  //       return false;
+  //     }
+  //   }
+  // }
+  // return true;
 
-void countStopVector(int **history, int *matrix, int *stopFlags,
-                     int iteration, int rows, int columns) {
-  int componentVector;
-
-  for (int i = 0; i < iteration; i++) {
-    componentVector = 1;
-
-    if (!equalsToPrevEvolution(history[i], matrix, rows, columns)) {
-      componentVector = 0;
-      break;
-    }
-
-    if (componentVector == 0) {
-      break;
-    }
-
-    stopFlags[i] = componentVector;
-  }
-}
-
-void countStopFlags(int **historyOfEvolution, bool *stopFlag,
-                    int *rowsNumArray, int iter, int rankOfCurrProc,
-                    int amountOfProcs, int rows, int columns) {
-  if (iter == 0) {
-    for (int proc = 0; proc < amountOfProcs; proc++) {
-      stopFlag[proc] = 0;
-      return;
-    }
-  }
-
-  int *now = historyOfEvolution[iter];
-
-  for (int i = 0; i < iter; i++) {
-    stopFlag[iter * rankOfCurrProc + i] = 1;
-    if (!equalsToPrevEvolution(historyOfEvolution[i], now, rows,
-                               columns)) {
-      stopFlag[iter * rankOfCurrProc + i] = 0;
-    }
-  }
-}
-
-bool checkComparison(bool *allStopVectors, int iteration,
-                     int rankOfCurrProc, int amountOfProcs) {
-  for (int i = 0; i < iteration; i++) {
-    if (allStopVectors[i] == false) {
+  for (int i = 0; i < size; i++) {
+    if (prevMatr[i] != currMatrix[i]) {
       return false;
     }
   }
   return true;
+}
+
+bool *calcVector(int **historyOfEvolution, int *currentGen, int iter,
+                 int size) {
+  bool *vectorStop = new bool[iter];
+  for (int j = 0; j < iter; j++) {
+    vectorStop[j] = equalsToPrevEvolution(historyOfEvolution[j],
+                                          currentGen, size);
+  }
+  return vectorStop;
 }
 
 int main(int argc, char **argv) {
@@ -292,11 +258,25 @@ int main(int argc, char **argv) {
 
     // // 5 - count vector of stop flags
     // countStopFlags(historyOfEvolution, vectorStopFlagPerIter,
-    //                rowsNumArray, iterCurr, rankOfCurrProc,
-    //                amountOfProcs, rowsNumArray[rankOfCurrProc],
-    //                columnsAmount);
+    //                aliveCells, rowsNumArray, iterCurr,
+    //                rankOfCurrProc, amountOfProcs,
+    //                rowsNumArray[rankOfCurrProc], columnsAmount);
 
-    // // 6 - init changing of stop vectors with all cores
+    bool *stopMatrix;
+    bool *stopVector;
+    if (iterCurr > 1) {
+      stopMatrix = new bool[(iterCurr - 1) * amountOfProcs];
+
+      stopVector =
+          calcVector(historyOfEvolution, currentGen, iterCurr - 1,
+                     elemsNumArray[rankOfCurrProc]);
+
+      // // 6 - init changing of stop vectors with all cores
+      MPI_Iallgather(stopVector, iterCurr - 1, MPI_C_BOOL, stopMatrix,
+                     elemsNumArray[rankOfCurrProc], MPI_C_BOOL,
+                     MPI_COMM_WORLD, &requestVector);
+    }
+
     // MPI_Ialltoall(vectorStopFlagPerIter, iterCurr, MPI_C_BOOL,
     //               allStopVectors, iterCurr, MPI_C_BOOL,
     //               MPI_COMM_WORLD, &requestVector);
@@ -330,8 +310,11 @@ int main(int argc, char **argv) {
     //     columnsAmount], 3, columnsAmount);
     // // 14 - wait end of exchanginf stop vectors with each other
     // // process
-    // MPI_Wait(&requestVector, &status);
-
+    MPI_Wait(&requestVector, &status);
+    if (iterCurr > 1) {
+      delete[] stopVector;
+      delete[] stopMatrix;
+    }
     // // 15 - compare vectors of stop
     // if (checkComparison(allStopVectors, iterCurr, rankOfCurrProc,
     //                     amountOfProcs)) {

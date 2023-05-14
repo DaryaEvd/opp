@@ -174,7 +174,7 @@ void countStopFlags(int **historyOfEvolution, bool *stopFlag,
 }
 
 bool checkComparison(bool *allStopVectors, int iteration,
-                     int amountOfProcs, int rankOfCurrProc) {
+                     int rankOfCurrProc, int amountOfProcs) {
   for (int i = 0; i < iteration; i++) {
     if (allStopVectors[i] == false) {
       return false;
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
 
     // 10 - count stages of the first line
     // computeNextGenerationInFirstLine()
-    computeNextGeneration(currGen, nextGen, 3, columnsAmount);
+    computeNextGeneration(currentGen, nextGen, 3, columnsAmount);
 
     // 11 - wait end sending last line to the next core
     MPI_Wait(&requestLastLineSend, &status);
@@ -331,12 +331,17 @@ int main(int argc, char **argv) {
     MPI_Wait(&requestVector, &status);
 
     // 15 - compare vectors of stop
-    if (checkComparison((allStopVectors, iterCurr, rankOfCurrProc,
-                         amountOfProcs))) {
+    if (checkComparison(allStopVectors, iterCurr, rankOfCurrProc,
+                         amountOfProcs)) {
+      repeated = true;
       break;
     }
 
     iterCurr++;
+  }
+
+  if (repeated) {
+    std::cout << "repeated " << std::endl;
   }
 
   MPI_Finalize();

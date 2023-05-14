@@ -144,7 +144,7 @@ void countStopVector(int **history, int *matrix, int *stopFlags,
       break;
     }
 
-    if(componentVector == 0) {
+    if (componentVector == 0) {
       break;
     }
 
@@ -241,14 +241,18 @@ int main(int argc, char **argv) {
   MPI_Request requestLastLineSend;
   MPI_Request requestGetLastLine;
   MPI_Request requestGetFirstLine;
+  MPI_Request requestVector;
 
   MPI_Status status;
 
   int *matrixStopFlag = new int[maxIterations * amountOfProcs];
-  int *vectorStopFlag = new int[maxIterations];
+ 
+  int *vectorStopFlagSend = new int[maxIterations];
+  int *vectorStopFlagRecv = new int[maxIterations];
 
   for (int i = 0; i < maxIterations; i++) {
-    vectorStopFlag[i] = 0;
+    vectorStopFlagSend[i] = 0;
+    vectorStopFlagRecv[i] = 0;
   }
 
   while (iterCurr < maxIterations && !repeated) {
@@ -273,27 +277,15 @@ int main(int argc, char **argv) {
     MPI_Irecv(lowerLine, columnsAmount, MPI_INT, rankNext,
               tagFirstLine, MPI_COMM_WORLD, &requestGetFirstLine);
 
-    // historyOfEvolution[iterCurr] =
-    //     new int[elemsNumArray[rankOfCurrProc]]();
-
-    // copyMatrix(historyOfEvolution, partCurrGen,
-    //            rowsNumArray[iterCurr], columnsAmount);
-
-    // copyMatrix(currentGen, nextGen, rowsNumArray[iterCurr],
-    //            columnsAmount);
-
-    // for (int i = iterCurr; i > -1; i--) {
-    //   if (equalsToPrevEvolution(
-    //           historyOfEvolution[iterCurr], partCurrGen,
-    //           rowsNumArray[rankOfCurrProc], columnsAmount)) {
-    //     vectorStopFlag[i] = 1;
-    //   } else {
-    //     vectorStopFlag[i] = 0;
-    //   }
-    // }
-
-    countStopVector(historyOfEvolution, partCurrGen, vectorStopFlag,
+    // 5 - count vector of stop flags
+    countStopVector(historyOfEvolution, partCurrGen, vectorStopFlagSend,
                     iterCurr, rowsNumArray[iterCurr], columnsAmount);
+
+    // 6 - init changing of stop vectors with all cores
+    MPI_Ialltoall(vectorStopFlagSend, iterCurr,
+                    MPI_INT, vectorStopFlagRecv,
+                 iterCurr, MPI_INT,
+                  MPI_COMM_WORLD, &requestVector);
 
     // 7 - count stages of rows, except first and last line
     computeNextGeneration(partCurrGen, partNextGen, rowsAmount,
@@ -306,6 +298,8 @@ int main(int argc, char **argv) {
     MPI_Wait(&requestGetLastLine, &status);
 
     // 10 - count stages of the first line
+    
+
   }
 
   MPI_Finalize();

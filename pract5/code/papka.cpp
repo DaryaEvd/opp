@@ -84,6 +84,50 @@ bool equalsToPrevEvolution(int *prevMatr, int *currMatrix, int rows,
   return true;
 }
 
+// x - rows, y - columns
+int countNeighbors(int *data, int rows, int columns, int xMatr,
+                   int yMatr) {
+  int sum = 0;
+
+  for (int i = -1; i < 2; ++i) {   // rows
+    for (int j = -1; j < 2; ++j) { // columns
+
+      int currRow = (xMatr + i + rows) % rows;
+      int currColumn = (yMatr + j + columns) % columns;
+
+      sum += data[currRow * columns + currColumn];
+    }
+  }
+
+  sum -= data[xMatr * columns + yMatr]; // cell itself
+  // std::cout << "SUMMA is: " << sum << std::endl << std::endl;
+
+  return sum;
+}
+
+void computeNextGeneration(int *oldData, int *nextData, int rows,
+                           int columns) {
+  for (int i = 0; i < rows; ++i) {
+    for (int j = 0; j < columns; ++j) {
+
+      int state = oldData[i * columns + j];
+
+      std::cout << i << " " << j << "   ";
+      int neighborsAmount =
+          countNeighbors(oldData, rows, columns, i, j);
+
+      if (state == 0 && neighborsAmount == 3) {
+        nextData[i * columns + j] = 1;
+      } else if (state == 1 &&
+                 (neighborsAmount < 2 || neighborsAmount > 3)) {
+        nextData[i * columns + j] = 0;
+      } else {
+        nextData[i * columns + j] = oldData[i * columns + j] = state;
+      }
+    }
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc != 3) {
     std::cout << "Bad amount of arguments!\n"
@@ -164,6 +208,7 @@ int main(int argc, char **argv) {
   int rankNext = rankOfCurrProc + 1;
 
   int *nextGen = new int[rowsAmount * columnsAmount]();
+  int *partNextGen = new int[elemsNumArray[rankOfCurrProc]]();
 
   int tagFirstLine = 0;
   int tagLastLine = 1;
@@ -173,14 +218,16 @@ int main(int argc, char **argv) {
   MPI_Request requestGetLastLine;
   MPI_Request requestGetFirstLine;
 
+  MPI_Status status;
+
   while (iterCurr < maxIterations && !repeated) {
 
-    // initiation of sending first line to the prev core
+    // 1 - initiation of sending first line to the prev core
     MPI_Isend(partCurrGen, elemsNumArray[rankOfCurrProc], MPI_INT,
               rankPrev, tagFirstLine, MPI_COMM_WORLD,
               &requestFirstLineSend);
 
-    // initiation of sending last line the to next core
+    // 2 - initiation of sending last line the to next core
     MPI_Isend(
         // partCurrGen[elemsNumArray[rankOfCurrProc] - columnsAmount],
         &partCurrGen[rowsOffsetArray[rankOfCurrProc] -
@@ -188,12 +235,12 @@ int main(int argc, char **argv) {
         elemsNumArray[rankOfCurrProc], MPI_INT, rankNext, tagLastLine,
         MPI_COMM_WORLD, &requestLastLineSend);
 
-    // initiation of receiving last line from the previous core
+    // 3 - initiation of receiving last line from the previous core
     MPI_Irecv(upperLine, elemsNumArray[rankOfCurrProc], MPI_INT,
               rankPrev, tagLastLine, MPI_COMM_WORLD,
               &requestGetLastLine);
 
-    // initiation of receiving first line from the next core
+    // 4 - initiation of receiving first line from the next core
     MPI_Irecv(lowerLine, elemsNumArray[rankOfCurrProc], MPI_INT,
               rankNext, tagFirstLine, MPI_COMM_WORLD,
               &requestGetFirstLine);
@@ -202,6 +249,19 @@ int main(int argc, char **argv) {
     for (int core = 0; core < amountOfProcs; core++) {
       // equalsToPrevEvolution()
     }
+
+    // 7 - count stages of rows, except first and last line
+    computeNextGeneration(partCurrGen, partNextGen, rowsAmount, columnsAmount);
+
+    // 8 - wait end receiving from the 2nd step
+    MPI_Wait(&requestLastLineSend,  &status);
+
+    // 9 - wait end of receiving from the 3rd step
+    MPI_Wait(&requestGetLastLine, &status); 
+
+    // 10 - count stages of the first line
+
+
   }
 
   MPI_Finalize();

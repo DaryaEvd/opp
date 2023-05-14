@@ -152,6 +152,27 @@ void countStopVector(int **history, int *matrix, int *stopFlags,
   }
 }
 
+void countStopFlags(int **historyOfEvolution, bool *stopFlag,
+                    int *rowsNumArray, int iter, int rankOfCurrProc,
+                    int amountOfProcs, int rows, int columns) {
+  if (iter == 0) {
+    for (int proc = 0; proc < amountOfProcs; proc++) {
+      stopFlag[proc] = 0;
+      return;
+    }
+  }
+
+  int *now = historyOfEvolution[iter];
+
+  for (int i = 0; i < iter; i++) {
+    stopFlag[iter * rankOfCurrProc + i] = 1;
+    if (!equalsToPrevEvolution(historyOfEvolution[i], now, rows,
+                               columns)) {
+      stopFlag[iter * rankOfCurrProc + i] = 0;
+    }
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc != 3) {
     std::cout << "Bad amount of arguments!\n"
@@ -170,7 +191,19 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &amountOfProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rankOfCurrProc);
 
-  int *currentGen = new int[rowsAmount * columnsAmount]();
+  const long maxIterations = 1000;
+  int **historyOfEvolution =
+      new int *[maxIterations](); // TODO: don't forget to init mem
+
+  // amount of elems, handling each process
+  int *elemsNumArray = countElemsNumInEachProc(
+      amountOfProcs, rowsAmount, columnsAmount);
+
+  // amount of rows, which each process handles
+  int *rowsNumArray = countRowsInEachProcess(
+      elemsNumArray, amountOfProcs, columnsAmount);
+
+  historyOfEvolution[0] = new int[rowsNumArray[rankOfCurrProc] + 2]();
 
   if (rankOfCurrProc == 0) {
     std::fstream inputFile;
@@ -181,27 +214,11 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-    generateGlider(currentGen, rowsAmount, columnsAmount);
+    generateGlider(historyOfEvolution[0], rowsAmount, columnsAmount);
 
-    printMatrixToFile(currentGen, rowsAmount, columnsAmount,
-                      inputFile);
+    printMatrixToFile(historyOfEvolution[0], rowsAmount,
+                      columnsAmount, inputFile);
   }
-
-  // amount of elems, handling each process
-  int *elemsNumArray = countElemsNumInEachProc(
-      amountOfProcs, rowsAmount, columnsAmount);
-
-  // amount of rows, which each process handles
-  int *rowsNumArray = countRowsInEachProcess(
-      elemsNumArray, amountOfProcs, columnsAmount);
-
-  // count, from which element data sends to each process
-  int *elementsOffsetArray =
-      createElemsOffsetArr(elemsNumArray, amountOfProcs);
-
-  // count, from which row data sends to each process
-  int *rowsOffsetArray = createRowsOffsetArr(
-      elementsOffsetArray, amountOfProcs, rowsAmount);
 
   if (rankOfCurrProc == 0) {
     for (int i = 0; i < amountOfProcs; i++) {
@@ -209,30 +226,11 @@ int main(int argc, char **argv) {
     }
   }
 
-  int *partCurrGen = new int[elemsNumArray[rankOfCurrProc]]();
-
-  MPI_Scatterv(currentGen, elemsNumArray, elementsOffsetArray,
-               MPI_INT, partCurrGen, elemsNumArray[rankOfCurrProc],
-               MPI_INT, 0, MPI_COMM_WORLD);
-
-  int *upperLine = new int[columnsAmount]();
-  int *lowerLine = new int[columnsAmount]();
-
-  const long maxIterations = 1000;
-
-  int **historyOfEvolution =
-      new int *[maxIterations](); // TODO: don't forget to init mem
-
-  int iterCurr = 0;
-  bool repeated = false;
-
-  // determine lower and upper nrighbour
+  int *currentGen; // = new int[rowsAmount * columnsAmount]();
+  int *nextGen;    // = new int[rowsAmount * columnsAmount]();
 
   int rankPrev = (amountOfProcs + rankOfCurrProc - 1) % amountOfProcs;
   int rankNext = (amountOfProcs + rankOfCurrProc + 1) % amountOfProcs;
-
-  int *nextGen = new int[rowsAmount * columnsAmount]();
-  int *partNextGen = new int[elemsNumArray[rankOfCurrProc]]();
 
   int tagFirstLine = 0;
   int tagLastLine = 1;
@@ -245,61 +243,60 @@ int main(int argc, char **argv) {
 
   MPI_Status status;
 
-  int *matrixStopFlag = new int[maxIterations * amountOfProcs];
- 
-  int *vectorStopFlagSend = new int[maxIterations];
-  int *vectorStopFlagRecv = new int[maxIterations];
+  bool *vectorStopFlagPerIter = new bool[maxIterations];
+  bool *allStopFVetors = new bool[maxIterations * amountOfProcs];
 
-  for (int i = 0; i < maxIterations; i++) {
-    vectorStopFlagSend[i] = 0;
-    vectorStopFlagRecv[i] = 0;
-  }
+  int iterCurr = 0;
+  bool repeated = false;
 
   while (iterCurr < maxIterations && !repeated) {
 
+    historyOfEvolution[iterCurr + 1] =
+        new int[((rowsNumArray[rankOfCurrProc] + 2) * columnsAmount)];
+
+    currentGen = historyOfEvolution[iterCurr];
+    nextGen = historyOfEvolution[iterCurr + 1];
+
     // 1 - initiation of sending first line to the prev core
-    MPI_Isend(partCurrGen, columnsAmount, MPI_INT, rankPrev,
-              tagFirstLine, MPI_COMM_WORLD, &requestFirstLineSend);
+    MPI_Isend(&currentGen[columnsAmount], columnsAmount, MPI_INT,
+              rankPrev, tagFirstLine, MPI_COMM_WORLD,
+              &requestFirstLineSend);
 
     // 2 - initiation of sending last line the to next core
     MPI_Isend(
-        // partCurrGen[elemsNumArray[rankOfCurrProc] - columnsAmount],
-        &partCurrGen[rowsOffsetArray[rankOfCurrProc] -
-                     1], // mb not -1, but -2, idk yet ...
+        &currentGen[(rowsNumArray[rankOfCurrProc]) * columnsAmount],
         columnsAmount, MPI_INT, rankNext, tagLastLine, MPI_COMM_WORLD,
         &requestLastLineSend);
 
     // 3 - initiation of receiving last line from the previous core
-    MPI_Irecv(upperLine, columnsAmount, MPI_INT, rankPrev,
+    MPI_Irecv(currentGen, columnsAmount, MPI_INT, rankPrev,
               tagLastLine, MPI_COMM_WORLD, &requestGetLastLine);
 
     // 4 - initiation of receiving first line from the next core
-    MPI_Irecv(lowerLine, columnsAmount, MPI_INT, rankNext,
-              tagFirstLine, MPI_COMM_WORLD, &requestGetFirstLine);
+    MPI_Irecv(&currentGen[(rowsNumArray[rankOfCurrProc] + 1) *
+                          columnsAmount],
+              columnsAmount, MPI_INT, rankNext, tagFirstLine,
+              MPI_COMM_WORLD, &requestGetFirstLine);
 
     // 5 - count vector of stop flags
-    countStopVector(historyOfEvolution, partCurrGen, vectorStopFlagSend,
-                    iterCurr, rowsNumArray[iterCurr], columnsAmount);
+    countStopFlags(historyOfEvolution, vectorStopFlagPerIter,
+                   rowsNumArray, iterCurr, rankOfCurrProc,
+                   amountOfProcs, rowsNumArray[rankOfCurrProc],
+                   columnsAmount);
 
     // 6 - init changing of stop vectors with all cores
-    MPI_Ialltoall(vectorStopFlagSend, iterCurr,
-                    MPI_INT, vectorStopFlagRecv,
-                 iterCurr, MPI_INT,
-                  MPI_COMM_WORLD, &requestVector);
 
     // 7 - count stages of rows, except first and last line
-    computeNextGeneration(partCurrGen, partNextGen, rowsAmount,
-                          columnsAmount);
 
     // 8 - wait end receiving from the 2nd step
-    MPI_Wait(&requestLastLineSend, &status);
+    // MPI_Wait(&requestLastLineSend, &status);
 
     // 9 - wait end of receiving from the 3rd step
-    MPI_Wait(&requestGetLastLine, &status);
+    // MPI_Wait(&requestGetLastLine, &status);
 
     // 10 - count stages of the first line
-    
 
+    iterCurr++;
   }
 
   MPI_Finalize();

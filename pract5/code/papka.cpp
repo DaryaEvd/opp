@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
   int iterCurr = 0;
   bool repeated = false;
 
-  while (iterCurr < maxIterations && !repeated) {
+  while (!repeated) {
 
     historyOfEvolution[iterCurr + 1] =
         new int[((rowsNumArray[rankOfCurrProc] + 2) * columnsAmount)];
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
 
     // // 10 - count stages of the first line
     // // computeNextGenerationInFirstLine()
-    // computeNextGeneration(currentGen, nextGen, 3, columnsAmount);
+    computeNextGeneration(currentGen, nextGen, 3, columnsAmount);
 
     // // 11 - wait end sending last line to the next core
     MPI_Wait(&requestSendLastLine, &status);
@@ -314,31 +314,29 @@ int main(int argc, char **argv) {
     MPI_Wait(&requestGetFirstLine, &status);
 
     // // 13 - count stages of the last line
-    // computeNextGeneration(
-    //     &currentGen[(rowsNumArray[rankOfCurrProc] - 3) *
-    //                 columnsAmount],
-    //     &nextGen[(rowsNumArray[rankOfCurrProc] - 3) *
-    //     columnsAmount], 3, columnsAmount);
+    computeNextGeneration(
+        &currentGen[(rowsNumArray[rankOfCurrProc] - 3) *
+                    columnsAmount],
+        &nextGen[(rowsNumArray[rankOfCurrProc] - 3) * columnsAmount],
+        3, columnsAmount);
 
-    // // 14 - wait end of exchanginf stop vectors with each other
-    // // process
+    std::copy(nextGen, &nextGen[elemsNumArray[rankOfCurrProc]],
+              currentGen);
+
     if (iterCurr > 1) {
+      // 14 - wait end of exchanginf stop vectors with each other
+      // process
       MPI_Wait(&requestVector, MPI_STATUS_IGNORE);
 
-      // if (isEnd(stopMatrix, iterCurr - 1, amountOfProcs)) {
-      //   repeated = true;
-      //   break;
-      // }
+      // 15 - compare vectors of stop
+      if (isEnd(stopMatrix, iterCurr - 1, amountOfProcs)) {
+        repeated = true;
+        // break;
+      }
 
       delete[] stopVector;
       delete[] stopMatrix;
     }
-    // // 15 - compare vectors of stop
-    // if (checkComparison(allStopVectors, iterCurr, rankOfCurrProc,
-    //                     amountOfProcs)) {
-    //   repeated = true;
-    //   break;
-    // }
 
     iterCurr++;
   }

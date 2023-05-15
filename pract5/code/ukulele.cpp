@@ -21,13 +21,13 @@ bool CompareMatrices(const bool *first, const bool *second,
   return true;
 }
 
-void CalculateStopVector(std::vector<bool *> historyOfEvolution,
-                         bool *stop_vector, bool *extendedPartMatr,
-                         int rowsAmount, int columnsAmount) {
+void calcStopVectors(std::vector<bool *> historyOfEvolution,
+                     bool *stopVector, bool *extendedPartMatr,
+                     int rowsAmount, int columnsAmount) {
   size_t vector_size = historyOfEvolution.size() - 1;
   auto it = historyOfEvolution.begin();
   for (int i = 0; i < vector_size; ++i) {
-    stop_vector[i] =
+    stopVector[i] =
         CompareMatrices(*it, extendedPartMatr, columnsAmount,
                         columnsAmount * (rowsAmount + 1));
     it++;
@@ -35,29 +35,17 @@ void CalculateStopVector(std::vector<bool *> historyOfEvolution,
 }
 
 bool CheckIsEnd(int rowsAmount, int columnsAmount,
-                const bool *stop_matrix) {
+                const bool *stopMatrix) {
   for (int i = 0; i < columnsAmount; ++i) {
     bool stop = true;
     for (int j = 0; j < rowsAmount; ++j) {
-      stop &= stop_matrix[j * columnsAmount + i];
+      stop &= stopMatrix[j * columnsAmount + i];
     }
     if (stop)
       return true;
   }
   return false;
 }
-
-// bool CheckIsEnd(bool *stop, int num, int size) {
-//   for (int i = 0; i < num; i++) {
-//     int res = 0;
-//     for (int j = 0; j < size; j++)
-//       res += stop[i + j * num];
-//     if (res == size)
-//       return true;
-//   }
-
-//   return false;
-// }
 
 bool MakeDecision(bool prev, int cnt) {
   if (prev) {
@@ -70,8 +58,8 @@ bool MakeDecision(bool prev, int cnt) {
   return prev;
 }
 
-void CalcNext(int rowsAmount, int columnsAmount, const bool *prev,
-              bool *next) {
+void computeNextGeneration(const bool *prev, bool *next,
+                           int rowsAmount, int columnsAmount) {
   for (int i = 1; i < rowsAmount - 1; ++i) {
     for (int j = 0; j < columnsAmount; ++j) {
       int cnt = 0;
@@ -209,59 +197,42 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
 
     // Check
     MPI_Request flagsReq;
-    bool *stop_vector;
-    bool *stop_matrix;
+    bool *stopVector;
+    bool *stopMatrix;
     int vector_size = historyOfEvolution.size() - 1;
     if (vector_size > 1) {
-      stop_vector = new bool[vector_size];
-      CalculateStopVector(historyOfEvolution, stop_vector,
-                          extendedPartMatr,
-                          rowsNumArr[rankOfCurrProc], columnsAmount);
-      stop_matrix = new bool[vector_size * amountOfProcs];
-      MPI_Iallgather(stop_vector, (int)vector_size, MPI_C_BOOL,
-                     stop_matrix, (int)vector_size, MPI_C_BOOL,
+      stopVector = new bool[vector_size];
+      calcStopVectors(historyOfEvolution, stopVector,
+                      extendedPartMatr, rowsNumArr[rankOfCurrProc],
+                      columnsAmount);
+      stopMatrix = new bool[vector_size * amountOfProcs];
+      MPI_Iallgather(stopVector, (int)vector_size, MPI_C_BOOL,
+                     stopMatrix, (int)vector_size, MPI_C_BOOL,
                      MPI_COMM_WORLD, &flagsReq);
-
-      // MPI_Ialltoall(stop_vector, vector_size, MPI_C_BOOL,
-      // stop_matrix,
-      //               vector_size, MPI_C_BOOL, MPI_COMM_WORLD,
-      // &flagsReq);
-
-      // MPI_Wait(&flagsReq, MPI_STATUS_IGNORE);
-
-      // stop = CheckIsEnd(amountOfProcs, (int)vector_size,
-      // stop_matrix);
-      // // stop = CheckIsEnd(stop_vector, iteration, amountOfProcs);
-
-      // delete[] stop_vector;
-      // delete[] stop_matrix;
     }
 
-    // if (stop)
-    //   break;
-
-    CalcNext(rowsNumArr[rankOfCurrProc], columnsAmount, basePartMatr,
-             baseNextPartMatr);
+    computeNextGeneration(basePartMatr, baseNextPartMatr,
+                          rowsNumArr[rankOfCurrProc], columnsAmount);
     MPI_Wait(&requestSendFirstLine, MPI_STATUS_IGNORE);
     MPI_Wait(&requestGetLastLine, MPI_STATUS_IGNORE);
-    CalcNext(3, columnsAmount, extendedPartMatr,
-             extendedNextPartMatr);
+    computeNextGeneration(extendedPartMatr, extendedNextPartMatr, 3,
+                          columnsAmount);
     MPI_Wait(&requestSendLastLine, MPI_STATUS_IGNORE);
     MPI_Wait(&requestGetFirstLine, MPI_STATUS_IGNORE);
-    CalcNext(3, columnsAmount,
-             basePartMatr +
-                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
-             baseNextPartMatr +
-                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount);
+    computeNextGeneration(
+        basePartMatr +
+            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+        baseNextPartMatr +
+            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+        3, columnsAmount);
 
     if (vector_size > 1) {
       MPI_Wait(&flagsReq, MPI_STATUS_IGNORE);
 
-      stop = CheckIsEnd(amountOfProcs, (int)vector_size, stop_matrix);
-      // stop = CheckIsEnd(stop_vector, iteration, amountOfProcs);
+      stop = CheckIsEnd(amountOfProcs, (int)vector_size, stopMatrix);
 
-      delete[] stop_vector;
-      delete[] stop_matrix;
+      delete[] stopVector;
+      delete[] stopMatrix;
     }
 
     if (stop)

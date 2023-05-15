@@ -34,8 +34,8 @@ void calcStopVectors(std::vector<bool *> historyOfEvolution,
   }
 }
 
-bool CheckIsEnd(int rowsAmount, int columnsAmount,
-                const bool *stopMatrix) {
+bool isStop(int rowsAmount, int columnsAmount,
+            const bool *stopMatrix) {
   for (int i = 0; i < columnsAmount; ++i) {
     bool stop = true;
     for (int j = 0; j < rowsAmount; ++j) {
@@ -186,20 +186,31 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
     historyOfEvolution.push_back(extendedPartMatr);
 
     iteration++;
-    MPI_Request requestSendFirstLine, requestSendLastLine;
-    MPI_Request requestGetLastLine, requestGetFirstLine;
 
+    MPI_Request requestSendFirstLine;
+    // 1 - initiation of sending first line to the prev core
     MPI_Isend(basePartMatr, columnsAmount, MPI_C_BOOL, prevRank, 1,
               MPI_COMM_WORLD, &requestSendFirstLine);
+
+    MPI_Request requestSendLastLine;
+    // 2 - initiation of sending last line the to next core
     MPI_Isend(basePartMatr + counts[rankOfCurrProc] - columnsAmount,
               columnsAmount, MPI_C_BOOL, nextRank, 0, MPI_COMM_WORLD,
               &requestSendLastLine);
+
+    MPI_Request requestGetLastLine;
+    // 3 - initiation of receiving last line from the previous
+    // core
     MPI_Irecv(extendedPartMatr, columnsAmount, MPI_C_BOOL, prevRank,
               0, MPI_COMM_WORLD, &requestGetLastLine);
+
+    MPI_Request requestGetFirstLine;
+    // 4 - initiation of receiving first line from the next core
     MPI_Irecv(basePartMatr + counts[rankOfCurrProc], columnsAmount,
               MPI_C_BOOL, nextRank, 1, MPI_COMM_WORLD,
               &requestGetFirstLine);
 
+    // 5 - count vector of stop flags
     MPI_Request flagsReq;
     bool *stopVector;
     bool *stopMatrix;
@@ -210,30 +221,49 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
                       extendedPartMatr, rowsNumArr[rankOfCurrProc],
                       columnsAmount);
       stopMatrix = new bool[vector_size * amountOfProcs];
+
+      // 6 - init changing of stop vectors with all cores
+
       MPI_Iallgather(stopVector, (int)vector_size, MPI_C_BOOL,
                      stopMatrix, (int)vector_size, MPI_C_BOOL,
                      MPI_COMM_WORLD, &flagsReq);
     }
 
+    // 7 - count stages of rows, except first and last line
     computeNextGeneration(basePartMatr, baseNextPartMatr,
                           rowsNumArr[rankOfCurrProc], columnsAmount);
+
+    // 8 - wait end sending 1st line to prev core
     MPI_Wait(&requestSendFirstLine, MPI_STATUS_IGNORE);
+
+    // 9 - wait end of receiving from the 3rd step
     MPI_Wait(&requestGetLastLine, MPI_STATUS_IGNORE);
+
+    // 10 - count stages of the first line
     computeNextGeneration(extendedPartMatr, extendedNextPartMatr, 3,
                           columnsAmount);
-    MPI_Wait(&requestSendLastLine, MPI_STATUS_IGNORE);
-    MPI_Wait(&requestGetFirstLine, MPI_STATUS_IGNORE);
-    computeNextGeneration(
-        basePartMatr +
-            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
-        baseNextPartMatr +
-            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
-        3, columnsAmount);
+
+    11 - wait end sending last line to the next core MPI_Wait(
+             &requestSendLastLine, MPI_STATUS_IGNORE);
+
+    12 - wait end receiving MPI_Wait(&requestGetFirstLine,
+                                     MPI_STATUS_IGNORE);
+
+    13 - count stages of the last line computeNextGeneration(
+             basePartMatr +
+                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+             baseNextPartMatr +
+                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+             3, columnsAmount);
 
     if (vector_size > 1) {
+      // 14 - wait end of exchanging stop vectors with each other
+      // process
+
       MPI_Wait(&flagsReq, MPI_STATUS_IGNORE);
 
-      stop = CheckIsEnd(amountOfProcs, (int)vector_size, stopMatrix);
+      // 15 - compare vectors of stop
+      stop = isStop(amountOfProcs, (int)vector_size, stopMatrix);
 
       delete[] stopVector;
       delete[] stopMatrix;

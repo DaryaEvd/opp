@@ -12,8 +12,8 @@ void generateGlider(bool *extendedPartMatr, int columnsAmount) {
 }
 
 bool equalsMatrices(const bool *first, const bool *second,
-                    size_t from, size_t to) {
-  for (size_t i = from; i < to; ++i) {
+                    int realStart, int realEnd) {
+  for (int i = realStart; i < realEnd; ++i) {
     if (first[i] != second[i]) {
       return false;
     }
@@ -24,9 +24,9 @@ bool equalsMatrices(const bool *first, const bool *second,
 void calcStopVectors(std::vector<bool *> historyOfEvolution,
                      bool *stopVector, bool *extendedPartMatr,
                      int rowsAmount, int columnsAmount) {
-  size_t vector_size = historyOfEvolution.size() - 1;
+  int vectorSize = historyOfEvolution.size() - 1;
   auto it = historyOfEvolution.begin();
-  for (int i = 0; i < vector_size; ++i) {
+  for (int i = 0; i < vectorSize; ++i) {
     stopVector[i] =
         equalsMatrices(*it, extendedPartMatr, columnsAmount,
                        columnsAmount * (rowsAmount + 1));
@@ -47,7 +47,6 @@ bool isStop(int rowsAmount, int columnsAmount,
   return false;
 }
 
-// x - rows, y - columns
 int countNeighbors(bool *oldData, int columnsAmount, int i, int j) {
   int neighboirsAmount =
       (oldData[i * columnsAmount + (j + 1) % columnsAmount]) +
@@ -207,18 +206,18 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
     MPI_Request flagsReq;
     bool *stopVector;
     bool *stopMatrix;
-    int vector_size = historyOfEvolution.size() - 1;
-    if (vector_size > 1) {
-      stopVector = new bool[vector_size];
+    int vectorSize = historyOfEvolution.size() - 1;
+    if (vectorSize > 1) {
+      stopVector = new bool[vectorSize];
       calcStopVectors(historyOfEvolution, stopVector,
                       extendedPartMatr, rowsNumArr[rankOfCurrProc],
                       columnsAmount);
-      stopMatrix = new bool[vector_size * amountOfProcs];
+      stopMatrix = new bool[vectorSize * amountOfProcs];
 
       // 6 - init changing of stop vectors with all cores
 
-      MPI_Iallgather(stopVector, (int)vector_size, MPI_C_BOOL,
-                     stopMatrix, (int)vector_size, MPI_C_BOOL,
+      MPI_Iallgather(stopVector, (int)vectorSize, MPI_C_BOOL,
+                     stopMatrix, (int)vectorSize, MPI_C_BOOL,
                      MPI_COMM_WORLD, &flagsReq);
     }
 
@@ -253,14 +252,14 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
             (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
         3, columnsAmount);
 
-    if (vector_size > 1) {
+    if (vectorSize > 1) {
       // 14 - wait end of exchanging stop vectors with each other
       // process
 
       MPI_Wait(&flagsReq, &status);
 
       // 15 - compare vectors of stop
-      stop = isStop(amountOfProcs, (int)vector_size, stopMatrix);
+      stop = isStop(amountOfProcs, (int)vectorSize, stopMatrix);
 
       delete[] stopVector;
       delete[] stopMatrix;

@@ -49,27 +49,20 @@ bool isStop(int rowsAmount, int columnsAmount,
 
 // x - rows, y - columns
 int countNeighbors(bool *oldData, int columnsAmount, int i, int j) {
-  int cnt = 0;
-  if (oldData[i * columnsAmount + (j + 1) % columnsAmount])
-    cnt++;
-  if (oldData[i * columnsAmount +
-              (j + columnsAmount - 1) % columnsAmount])
-    cnt++;
-  if (oldData[(i + 1) * columnsAmount + (j + 1) % columnsAmount])
-    cnt++;
-  if (oldData[(i + 1) * columnsAmount +
-              (j + columnsAmount - 1) % columnsAmount])
-    cnt++;
-  if (oldData[(i - 1) * columnsAmount + (j + 1) % columnsAmount])
-    cnt++;
-  if (oldData[(i - 1) * columnsAmount +
-              (j + columnsAmount - 1) % columnsAmount])
-    cnt++;
-  if (oldData[(i + 1) * columnsAmount + j])
-    cnt++;
-  if (oldData[(i - 1) * columnsAmount + j])
-    cnt++;
-  return cnt;
+  int neighboirsAmount =
+      (oldData[i * columnsAmount + (j + 1) % columnsAmount]) +
+      (oldData[i * columnsAmount +
+               (j + columnsAmount - 1) % columnsAmount]) +
+      (oldData[(i + 1) * columnsAmount + (j + 1) % columnsAmount]) +
+      (oldData[(i + 1) * columnsAmount +
+               (j + columnsAmount - 1) % columnsAmount]) +
+      (oldData[(i - 1) * columnsAmount + (j + 1) % columnsAmount]) +
+      (oldData[(i - 1) * columnsAmount +
+               (j + columnsAmount - 1) % columnsAmount]) +
+      (oldData[(i + 1) * columnsAmount + j]) +
+      (oldData[(i - 1) * columnsAmount + j]);
+
+  return neighboirsAmount;
 }
 
 void computeNextGeneration(bool *oldData, bool *nextData,
@@ -264,7 +257,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
       // 14 - wait end of exchanging stop vectors with each other
       // process
 
-      MPI_Wait(&flagsReq, MPI_STATUS_IGNORE);
+      MPI_Wait(&flagsReq, &status);
 
       // 15 - compare vectors of stop
       stop = isStop(amountOfProcs, (int)vector_size, stopMatrix);

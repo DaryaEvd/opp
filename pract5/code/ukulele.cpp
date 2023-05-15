@@ -47,45 +47,95 @@ bool CheckIsEnd(int rowsAmount, int columnsAmount,
   return false;
 }
 
-bool MakeDecision(bool prev, int cnt) {
-  if (prev) {
+bool MakeDecision(bool oldData, int cnt) {
+  if (oldData) {
     if (cnt < 2 || cnt > 3)
       return false;
   } else {
     if (cnt == 3)
       return true;
   }
-  return prev;
+  return oldData;
 }
 
-void computeNextGeneration(const bool *prev, bool *next,
+// x - rows, y - columns
+int countNeighbors(bool *oldData, int columnsAmount, int i, int j) {
+  int cnt = 0;
+  if (oldData[i * columnsAmount + (j + 1) % columnsAmount])
+    cnt++;
+  if (oldData[i * columnsAmount +
+              (j + columnsAmount - 1) % columnsAmount])
+    cnt++;
+  if (oldData[(i + 1) * columnsAmount + (j + 1) % columnsAmount])
+    cnt++;
+  if (oldData[(i + 1) * columnsAmount +
+              (j + columnsAmount - 1) % columnsAmount])
+    cnt++;
+  if (oldData[(i - 1) * columnsAmount + (j + 1) % columnsAmount])
+    cnt++;
+  if (oldData[(i - 1) * columnsAmount +
+              (j + columnsAmount - 1) % columnsAmount])
+    cnt++;
+  if (oldData[(i + 1) * columnsAmount + j])
+    cnt++;
+  if (oldData[(i - 1) * columnsAmount + j])
+    cnt++;
+  return cnt;
+}
+
+void computeNextGeneration(bool *oldData, bool *nextData,
                            int rowsAmount, int columnsAmount) {
   for (int i = 1; i < rowsAmount - 1; ++i) {
     for (int j = 0; j < columnsAmount; ++j) {
-      int cnt = 0;
-      if (prev[i * columnsAmount + (j + 1) % columnsAmount])
-        cnt++;
-      if (prev[i * columnsAmount +
-               (j + columnsAmount - 1) % columnsAmount])
-        cnt++;
-      if (prev[(i + 1) * columnsAmount + (j + 1) % columnsAmount])
-        cnt++;
-      if (prev[(i + 1) * columnsAmount +
-               (j + columnsAmount - 1) % columnsAmount])
-        cnt++;
-      if (prev[(i - 1) * columnsAmount + (j + 1) % columnsAmount])
-        cnt++;
-      if (prev[(i - 1) * columnsAmount +
-               (j + columnsAmount - 1) % columnsAmount])
-        cnt++;
-      if (prev[(i + 1) * columnsAmount + j])
-        cnt++;
-      if (prev[(i - 1) * columnsAmount + j])
-        cnt++;
-      next[i * columnsAmount + j] =
-          MakeDecision(prev[i * columnsAmount + j], cnt);
+      // int cnt = 0;
+      // if (oldData[i * columnsAmount + (j + 1) % columnsAmount])
+      //   cnt++;
+      // if (oldData[i * columnsAmount +
+      //          (j + columnsAmount - 1) % columnsAmount])
+      //   cnt++;
+      // if (oldData[(i + 1) * columnsAmount + (j + 1) %
+      // columnsAmount])
+      //   cnt++;
+      // if (oldData[(i + 1) * columnsAmount +
+      //          (j + columnsAmount - 1) % columnsAmount])
+      //   cnt++;
+      // if (oldData[(i - 1) * columnsAmount + (j + 1) %
+      // columnsAmount])
+      //   cnt++;
+      // if (oldData[(i - 1) * columnsAmount +
+      //          (j + columnsAmount - 1) % columnsAmount])
+      //   cnt++;
+      // if (oldData[(i + 1) * columnsAmount + j])
+      //   cnt++;
+      // if (oldData[(i - 1) * columnsAmount + j])
+      //   cnt++;
+
+      int cnt = countNeighbors(oldData, columnsAmount, i, j);
+      nextData[i * columnsAmount + j] =
+          MakeDecision(oldData[i * columnsAmount + j], cnt);
     }
   }
+
+  // for (int i = 0; i < rowsAmount; ++i) {
+  //   for (int j = 0; j < columnsAmount; ++j) {
+
+  //     int state = oldData[i * columnsAmount + j];
+
+  //     // std::cout << i << " " << j << "   ";
+  //     int neighborsAmount =
+  //         countNeighbors(oldData, rowsAmount, columnsAmount, i, j);
+
+  //     if (state == 0 && neighborsAmount == 3) {
+  //       nextData[i * columnsAmount + j] = 1;
+  //     } else if (state == 1 &&
+  //                (neighborsAmount < 2 || neighborsAmount > 3)) {
+  //       nextData[i * columnsAmount + j] = 0;
+  //     } else {
+  //       nextData[i * columnsAmount + j] = oldData[i * columnsAmount
+  //       + j] = state;
+  //     }
+  //   }
+  // }
 }
 
 int *countElemsNumInEachProc(int amountOfProcs, int rows,
@@ -238,7 +288,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
     if (stop)
       break;
 
-    // Switch main extendedPartMatr -- next iteration
+    // Switch main extendedPartMatr -- nextData iteration
     extendedPartMatr = extendedNextPartMatr;
     basePartMatr = baseNextPartMatr;
   }

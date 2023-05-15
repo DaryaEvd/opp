@@ -233,28 +233,32 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
     computeNextGeneration(basePartMatr, baseNextPartMatr,
                           rowsNumArr[rankOfCurrProc], columnsAmount);
 
+    MPI_Status status;
+
     // 8 - wait end sending 1st line to prev core
-    MPI_Wait(&requestSendFirstLine, MPI_STATUS_IGNORE);
+    MPI_Wait(&requestSendFirstLine, &status);
 
     // 9 - wait end of receiving from the 3rd step
-    MPI_Wait(&requestGetLastLine, MPI_STATUS_IGNORE);
+    MPI_Wait(&requestGetLastLine, &status);
 
     // 10 - count stages of the first line
     computeNextGeneration(extendedPartMatr, extendedNextPartMatr, 3,
                           columnsAmount);
 
-    11 - wait end sending last line to the next core MPI_Wait(
-             &requestSendLastLine, MPI_STATUS_IGNORE);
+    // 11 - wait end sending last line to the next core
+    MPI_Wait(&requestSendLastLine, &status);
 
-    12 - wait end receiving MPI_Wait(&requestGetFirstLine,
-                                     MPI_STATUS_IGNORE);
+    // 12 - wait end receiving
+    MPI_Wait(&requestGetFirstLine, &status);
 
-    13 - count stages of the last line computeNextGeneration(
-             basePartMatr +
-                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
-             baseNextPartMatr +
-                 (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
-             3, columnsAmount);
+    // 13 - count stages of the last line
+
+    computeNextGeneration(
+        basePartMatr +
+            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+        baseNextPartMatr +
+            (rowsNumArr[rankOfCurrProc] - 2) * columnsAmount,
+        3, columnsAmount);
 
     if (vector_size > 1) {
       // 14 - wait end of exchanging stop vectors with each other
@@ -269,8 +273,9 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
       delete[] stopMatrix;
     }
 
-    if (stop)
+    if (stop) {
       break;
+    }
 
     extendedPartMatr = extendedNextPartMatr;
     basePartMatr = baseNextPartMatr;

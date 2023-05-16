@@ -9,14 +9,6 @@ void generateGlider(int *data, int rows, int columns) {
   data[2 * columns + 2] = 1;
 }
 
-void initMatrixWithZeroes(int *data, int rows, int columns) {
-  for (int i = 0; i < rows; ++i) {
-    for (int j = 0; j < columns; ++j) {
-      data[i * columns + j] = 0;
-    }
-  }
-}
-
 void printMatrixToFile(int *data, int rows, int columns,
                        std::fstream &file) {
   for (int i = 0; i < rows; ++i) {
@@ -55,7 +47,7 @@ int countNeighbors(int *data, int rows, int columns, int xMatr,
 
   return sum;
 }
-
+                
 void computeNextGeneration(int *oldData, int *nextData, int rows,
                            int columns) {
   for (int i = 0; i < rows; ++i) {
@@ -63,6 +55,7 @@ void computeNextGeneration(int *oldData, int *nextData, int rows,
 
       int state = oldData[i * columns + j];
 
+      // std::cout << i << " " << j << "   ";
       int neighborsAmount =
           countNeighbors(oldData, rows, columns, i, j);
 
@@ -132,15 +125,15 @@ int main(int argc, char **argv) {
 
   const long maxIterations = 1000; 
 
-  int **prevEvolution = new int *[maxIterations]();
+  int **historyOfEvolution = new int *[maxIterations]();
 
   int iterCurr = 0;
   bool repeated = false;
 
   while (iterCurr < maxIterations && !repeated) {
-    prevEvolution[iterCurr] = new int[rowsAmount * columnsAmount]();
+    historyOfEvolution[iterCurr] = new int[rowsAmount * columnsAmount]();
 
-    copyMatrix(prevEvolution[iterCurr], currentGen, rowsAmount,
+    copyMatrix(historyOfEvolution[iterCurr], currentGen, rowsAmount,
                columnsAmount);
 
     computeNextGeneration(currentGen, nextGen, rowsAmount,
@@ -154,7 +147,7 @@ int main(int argc, char **argv) {
     copyMatrix(currentGen, nextGen, rowsAmount, columnsAmount);
 
     for (int i = iterCurr; i > -1; --i) {
-      if (equalsToPrevEvolution(prevEvolution[i], nextGen, rowsAmount,
+      if (equalsToPrevEvolution(historyOfEvolution[i], nextGen, rowsAmount,
                                 columnsAmount)) {
 
         // std::cout << "iter " << iterCurr << ": equals" <<
@@ -183,9 +176,9 @@ int main(int argc, char **argv) {
   delete[] nextGen;
 
   for (int i = 0; i < maxIterations; i++) {
-    delete[] prevEvolution[i];
+    delete[] historyOfEvolution[i];
   }
-  delete[] prevEvolution;
+  delete[] historyOfEvolution;
 
   return 0;
 }

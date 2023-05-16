@@ -4,11 +4,13 @@
 #include <vector>
 
 void generateGlider(bool *extendedPartMatr, int columnsAmount) {
+  std::fill(startMatrix, startMatrix + columnsAmount * rowsAmount,
+            false);
+  extendedPartMatr[0 * columnsAmount + 1] = true;
+  extendedPartMatr[1 * columnsAmount + 2] = true;
   extendedPartMatr[2 * columnsAmount + 0] = true;
   extendedPartMatr[2 * columnsAmount + 1] = true;
   extendedPartMatr[2 * columnsAmount + 2] = true;
-  extendedPartMatr[1 * columnsAmount + 2] = true;
-  extendedPartMatr[0 * columnsAmount + 1] = true;
 }
 
 bool equalsMatrices(const bool *first, const bool *second,
@@ -136,19 +138,19 @@ int *createRowsOffsetArr(const int *elementsOffsetArray,
 void startLife(int amountOfProcs, int rankOfCurrProc,
                bool *startMatrix, int rowsAmount, int columnsAmount) {
   // amount of elems, handling each process
-  int *counts = countElemsNumInEachProc(amountOfProcs, rowsAmount,
+  int *elemsInEachProc = countElemsNumInEachProc(amountOfProcs, rowsAmount,
                                         columnsAmount);
 
   // amount of rows, which each process handles
   int *rowsNumArr =
-      countRowsInEachProcess(counts, amountOfProcs, columnsAmount);
+      countRowsInEachProcess(elemsInEachProc, amountOfProcs, columnsAmount);
 
   // count, from which element data sends to each process
-  int *offsets = createElemsOffsetArr(counts, amountOfProcs);
+  int *offset = createElemsOffsetArr(elemsInEachProc, amountOfProcs);
 
   // count, from which row data sends to each process
   int *rowsOffsetArray =
-      createRowsOffsetArr(offsets, amountOfProcs, rowsAmount);
+      createRowsOffsetArr(offset, amountOfProcs, rowsAmount);
 
   // if (rankOfCurrProc == 0) {
   //   for (int i = 0; i < amountOfProcs; i++) {
@@ -157,11 +159,11 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
   // }
 
   bool *extendedPartMatr =
-      new bool[counts[rankOfCurrProc] + columnsAmount * 2];
+      new bool[elemsInEachProc[rankOfCurrProc] + columnsAmount * 2];
   bool *basePartMatr = extendedPartMatr + columnsAmount;
 
-  MPI_Scatterv(startMatrix, counts, offsets, MPI_C_BOOL, basePartMatr,
-               counts[rankOfCurrProc], MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(startMatrix, elemsInEachProc, offset, MPI_C_BOOL, basePartMatr,
+               elemsInEachProc[rankOfCurrProc], MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
   int prevRank = (rankOfCurrProc + amountOfProcs - 1) % amountOfProcs;
   int nextRank = (rankOfCurrProc + 1) % amountOfProcs;
@@ -173,7 +175,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
   while (!stop) {
 
     bool *extendedNextPartMatr =
-        new bool[counts[rankOfCurrProc] + 2 * columnsAmount];
+        new bool[elemsInEachProc[rankOfCurrProc] + 2 * columnsAmount];
     bool *baseNextPartMatr = extendedNextPartMatr + columnsAmount;
     historyOfEvolution.push_back(extendedPartMatr);
 
@@ -186,7 +188,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
 
     MPI_Request requestSendLastLine;
     // 2 - initiation of sending last line the to next core
-    MPI_Isend(basePartMatr + counts[rankOfCurrProc] - columnsAmount,
+    MPI_Isend(basePartMatr + elemsInEachProc[rankOfCurrProc] - columnsAmount,
               columnsAmount, MPI_C_BOOL, nextRank, 0, MPI_COMM_WORLD,
               &requestSendLastLine);
 
@@ -198,7 +200,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
 
     MPI_Request requestGetFirstLine;
     // 4 - initiation of receiving first line from the next core
-    MPI_Irecv(basePartMatr + counts[rankOfCurrProc], columnsAmount,
+    MPI_Irecv(basePartMatr + elemsInEachProc[rankOfCurrProc], columnsAmount,
               MPI_C_BOOL, nextRank, 1, MPI_COMM_WORLD,
               &requestGetFirstLine);
 
@@ -216,8 +218,8 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
 
       // 6 - init changing of stop vectors with all cores
 
-      MPI_Iallgather(stopVector, (int)vectorSize, MPI_C_BOOL,
-                     stopMatrix, (int)vectorSize, MPI_C_BOOL,
+      MPI_Iallgather(stopVector, vectorSize, MPI_C_BOOL,
+                     stopMatrix, vectorSize, MPI_C_BOOL,
                      MPI_COMM_WORLD, &flagsReq);
     }
 
@@ -259,7 +261,7 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
       MPI_Wait(&flagsReq, &status);
 
       // 15 - compare vectors of stop
-      stop = isStop(amountOfProcs, (int)vectorSize, stopMatrix);
+      stop = isStop(amountOfProcs, vectorSize, stopMatrix);
 
       delete[] stopVector;
       delete[] stopMatrix;
@@ -277,16 +279,16 @@ void startLife(int amountOfProcs, int rankOfCurrProc,
               << std::endl;
   }
 
-  for (bool *matrixDump : historyOfEvolution) {
-    delete[] (matrixDump);
+  for (auto matrix : historyOfEvolution) {
+    delete[] matrix;
   }
+  historyOfEvolution.clear();
 
-  delete[] offsets;
-  delete[] counts;
+  delete[] offset;
+  delete[] elemsInEachProc;
 }
 
 int main(int argc, char *argv[]) {
-
   if (argc != 3) {
     std::cout
         << "Bad amount of arguments!\n"
@@ -308,8 +310,6 @@ int main(int argc, char *argv[]) {
   bool *startMatrix = nullptr;
   if (rankOfCurrProc == 0) {
     startMatrix = new bool[rowsAmount * columnsAmount];
-    std::fill(startMatrix, startMatrix + columnsAmount * rowsAmount,
-              false);
     generateGlider(startMatrix, columnsAmount);
   }
 

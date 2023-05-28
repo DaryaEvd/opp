@@ -6,14 +6,14 @@
 #define AMOUNT_OF_LISTS 5
 #define WEIGHT_COEFFICIENT 100
 
-#define MIN_AMOUNT_OF_TASKS_TO_SHARE 10
-#define TASKS_PER_PROCESS 600
+#define MIN_AMOUNT_OF_TASKS_TO_SHARE 20
+#define TASKS_PER_PROCESS 400
 
 #define TAG_REQUEST 0
 #define TAG_REPLY 1
 
-double GLOBAL_RESULT = 0.0;
-double GLOABAL_RESULT_SUM = 0.0;
+double RES_PER_ITERATION = 0.0;
+double GLOABAL_RESULT_SIN = 0.0;
 
 int rankOfCurrProc, amountOfProcs;
 
@@ -24,19 +24,19 @@ int amountOfTasksAlreadyExecuted;
 pthread_mutex_t mutexTasks;
 pthread_mutex_t mutexTasksInRemain;
 
-pthread_t thread_receiver;
+pthread_t recvThread;
 
-void initTasksWeight(int *tasks, int iterCounter) {
+void initTasksWeight() {
   pthread_mutex_lock(&mutexTasks);
   for (int i = 0; i < TASKS_PER_PROCESS; ++i) {
     tasks[i] = abs(50 - i % 100) *
-               abs(rankOfCurrProc - (iterCounter % amountOfProcs)) *
+               abs(rankOfCurrProc - (TASKS_PER_PROCESS % amountOfProcs)) *
                WEIGHT_COEFFICIENT;
   }
   pthread_mutex_unlock(&mutexTasks);
 }
 
-void calculateTask(int *tasks) {
+void calculateTask() {
   pthread_mutex_lock(&mutexTasksInRemain);
 
   for (int i = 0; tasksInRemain; ++i, tasksInRemain--) {
@@ -49,7 +49,7 @@ void calculateTask(int *tasks) {
     pthread_mutex_unlock(&mutexTasks);
 
     for (int j = 0; j < task_weight; ++j) {
-      GLOBAL_RESULT += sin(j);
+      RES_PER_ITERATION += sin(j);
     }
 
     ++amountOfTasksAlreadyExecuted;
@@ -60,7 +60,7 @@ void calculateTask(int *tasks) {
 }
 
 void *receiverThreadGO(void *args) {
-  int tasks_to_share;
+  int tasksToSend;
   int rankRequestedTasks;
 
   while (true) {
@@ -73,24 +73,24 @@ void *receiverThreadGO(void *args) {
 
     pthread_mutex_lock(&mutexTasksInRemain);
     if (tasksInRemain >= MIN_AMOUNT_OF_TASKS_TO_SHARE) {
-      tasks_to_share = tasksInRemain / 2;
-      tasksInRemain -= tasks_to_share;
+      tasksToSend = tasksInRemain / 2;
+      tasksInRemain -= tasksToSend;
 
       // sending number of tasks that shares
-      MPI_Send(&tasks_to_share, 1, MPI_INT, rankRequestedTasks,
+      MPI_Send(&tasksToSend, 1, MPI_INT, rankRequestedTasks,
                TAG_REPLY, MPI_COMM_WORLD);
 
       pthread_mutex_lock(&mutexTasks);
       // sending tasks
       MPI_Send(tasks + amountOfTasksAlreadyExecuted + tasksInRemain -
                    1,
-               tasks_to_share, MPI_INT, rankRequestedTasks, TAG_REPLY,
+               tasksToSend, MPI_INT, rankRequestedTasks, TAG_REPLY,
                MPI_COMM_WORLD);
       pthread_mutex_unlock(&mutexTasks);
     } else {
-      tasks_to_share = 0;
+      tasksToSend = 0;
 
-      MPI_Send(&tasks_to_share, 1, MPI_INT, rankRequestedTasks,
+      MPI_Send(&tasksToSend, 1, MPI_INT, rankRequestedTasks,
                TAG_REPLY, MPI_COMM_WORLD);
     }
     pthread_mutex_unlock(&mutexTasksInRemain);
@@ -106,45 +106,43 @@ void *workerThreadStart(void *args) {
 
   for (int iterCounter = 0; iterCounter < AMOUNT_OF_LISTS;
        ++iterCounter) {
-    initTasksWeight(tasks, iterCounter);
+    initTasksWeight();
 
     pthread_mutex_lock(&mutexTasksInRemain);
     tasksInRemain = TASKS_PER_PROCESS;
     pthread_mutex_unlock(&mutexTasksInRemain);
     amountOfTasksAlreadyExecuted = 0;
-    int amountOfReceivedTasks;
+    int amountOfAdditionalasks;
 
     startt = MPI_Wtime();
 
-    calculateTask(tasks);
+    calculateTask();
 
-    // Start requesting tasks from other processes
-    //(sequental iterating)
+    //   requesting tasks from other processes
     for (int currentProc = 0; currentProc < amountOfProcs;
          ++currentProc) {
       if (currentProc == rankOfCurrProc)
         continue;
 
-      // Notificating other process that current process is free
-      // and want to execute extra tasks (sending other process
-      // current rankOfCurrProc)
+      // Send to other process that cur proc is free
+      // and can compute additional tasks
       MPI_Send(&rankOfCurrProc, 1, MPI_INT, currentProc, TAG_REQUEST,
                MPI_COMM_WORLD);
 
-      // Receive number of extra tasks
-      MPI_Recv(&amountOfReceivedTasks, 1, MPI_INT, currentProc,
+      // Receive number of additional tasks
+      MPI_Recv(&amountOfAdditionalasks, 1, MPI_INT, currentProc,
                TAG_REPLY, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-      if (amountOfReceivedTasks > 0) {
+      if (amountOfAdditionalasks > 0) {
         // Receive tasks
-        MPI_Recv(tasks, amountOfReceivedTasks, MPI_INT, currentProc,
+        MPI_Recv(tasks, amountOfAdditionalasks, MPI_INT, currentProc,
                  TAG_REPLY, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         pthread_mutex_lock(&mutexTasksInRemain);
-        tasksInRemain = amountOfReceivedTasks;
+        tasksInRemain = amountOfAdditionalasks;
         pthread_mutex_unlock(&mutexTasksInRemain);
 
-        calculateTask(tasks);
+        calculateTask();
       }
     }
 
@@ -163,7 +161,7 @@ void *workerThreadStart(void *args) {
                 << std::endl;
 
       std::cout << "Iteration numer: " << iterCounter << std::endl;
-      std::cout << "Imbalance time: " << maxTime - minTime
+      std::cout << "Disbalance time: " << maxTime - minTime
                 << std::endl;
       std::cout << "Disbalance percentage: "
                 << (maxTime - minTime) / maxTime * 100 << std::endl;
@@ -179,7 +177,7 @@ void *workerThreadStart(void *args) {
                   << std::endl;
         std::cout << "Amount of executed tasks: "
                   << amountOfTasksAlreadyExecuted << std::endl;
-        std::cout << "Result of calculating is: " << GLOBAL_RESULT
+        std::cout << "Result of calculating is: " << RES_PER_ITERATION
                   << std::endl;
         std::cout << "Time per iteration: " << resTime << " seconds"
                   << std::endl;
@@ -194,7 +192,7 @@ void *workerThreadStart(void *args) {
   MPI_Send(&rankOfCurrProc, 1, MPI_INT, rankOfCurrProc, 0,
            MPI_COMM_WORLD);
 
-  MPI_Allreduce(&GLOBAL_RESULT, &GLOABAL_RESULT_SUM, 1, MPI_DOUBLE,
+  MPI_Allreduce(&RES_PER_ITERATION, &GLOABAL_RESULT_SIN, 1, MPI_DOUBLE,
                 MPI_SUM, MPI_COMM_WORLD);
 
   delete tasks;
@@ -220,8 +218,8 @@ void createAndStartThreads() {
     abort();
   }
 
-  if (pthread_create(&thread_receiver, &attributes,
-                     receiverThreadGO, NULL) != 0) {
+  if (pthread_create(&recvThread, &attributes, receiverThreadGO,
+                     NULL) != 0) {
     MPI_Finalize();
     perror("Can't create thread");
     abort();
@@ -232,7 +230,7 @@ void createAndStartThreads() {
   workerThreadStart(NULL); // it's main thread
 
   // main thread is waitng for recieiver thread to finish
-  pthread_join(thread_receiver, NULL);
+  pthread_join(recvThread, NULL);
 
   pthread_mutex_destroy(&mutexTasks);
   pthread_mutex_destroy(&mutexTasksInRemain);

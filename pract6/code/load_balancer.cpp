@@ -42,7 +42,7 @@ void calculateTask() {
   for (int i = 0; tasksInRemain; ++i, tasksInRemain--) {
     pthread_mutex_unlock(&mutexTasksInRemain);
 
-    // когда отдается часть заданий функция не должна выоплнять часть
+    // когда отдается часть заданий, функция не должна выоплнять часть
     // заздания которая возможна будет прередана
     pthread_mutex_lock(&mutexTasks);
     int task_weight = tasks[i];

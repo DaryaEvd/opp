@@ -13,4 +13,5 @@ Parallel Programming course at NSU
 Отчет: [тык](https://github.com/DaryaEvd/opp/blob/main/pract4/%D0%9F%D1%80%D0%B0%D0%BA%D1%824_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf).  
 - [pract5](https://github.com/DaryaEvd/opp/tree/main/pract5) - Игра "Жизнь" Дж.Конвея,  
 Отчет: [тык](https://github.com/DaryaEvd/opp/blob/main/pract5/%D0%9F%D1%80%D0%B0%D0%BA%D1%825_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf).  
-- [pract6](https://github.com/DaryaEvd/opp/tree/main/pract6) - Программирование многопоточных приложений. Posix Threads.  
+- [pract6](https://github.com/DaryaEvd/opp/tree/main/pract6) - Программирование многопоточных приложений. Posix Threads. 
+Отчет: [тык](https://github.com/DaryaEvd/opp/blob/main/pract6/%D0%9F%D1%80%D0%B0%D0%BA%D1%826_%D0%95%D0%B2%D0%B4%D0%BE%D0%BA%D0%B8%D0%BC%D0%BE%D0%B2%D0%B0_21205.pdf).   
